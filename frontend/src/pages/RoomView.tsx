@@ -4,6 +4,7 @@ import { api, type AcousticDetails } from "../api";
 import EvidenceImage from "../components/EvidenceImage";
 import ObjectMatchReview from "../components/ObjectMatchReview";
 import RoomReview from "../components/RoomReview";
+import RoomSound from "../components/RoomSound";
 import { useRequest } from "../useRequest";
 
 function Dimensions({ dimensions }: { dimensions: NonNullable<AcousticDetails["dimensions"]> }) {
@@ -211,17 +212,7 @@ function Room({ sid, roomId }: { sid: string; roomId: string }) {
             setReviewCount((count) => count + 1);
           }} />
           {details.dimensions && <Dimensions dimensions={details.dimensions} />}
-          <section className="details-panel" aria-labelledby="echo-title">
-            <h2 id="echo-title">Estimated echo time</h2>
-            <dl className="metrics">
-              {details.bands_hz.map((band, index) => (
-                <div key={band}>
-                  <dt>{Number(band) >= 1000 ? `${Number(band) / 1000} kHz` : `${band} Hz`}</dt>
-                  <dd>{details.room.rt60[index].toFixed(2)} <span>s</span></dd>
-                </div>
-              ))}
-            </dl>
-          </section>
+          <RoomSound key={reviewCount} sid={sid} roomId={roomId} details={details} />
         </>
       )}
     </main>

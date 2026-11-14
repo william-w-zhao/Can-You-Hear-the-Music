@@ -10,8 +10,8 @@ async function get<T>(path: string): Promise<T> {
   return r.json();
 }
 
-async function post<T>(path: string, body?: unknown): Promise<T> {
-  const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body ?? {}) });
+async function post<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
+  const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body ?? {}), signal });
   if (!r.ok) {
     const error = await r.json().catch(() => null);
     throw new Error(typeof error?.detail === "string" ? error.detail : `Request failed (${r.status}).`);
@@ -61,6 +61,7 @@ export type RoomAcoustics = RoomMaterials & {
   id: string;
   rt60: [number, number, number];
   rt60_range_500: [number, number];
+  absorption_500: number;
   verdict: string;
 };
 
@@ -162,8 +163,14 @@ export const api = {
   suggestObjectMatch: (sid: string, roomId: string, detection_ids: ObjectPair) =>
     post<{ decision: "same" | "separate" | "unsure"; reason: string; model?: string }>(
       `${acousticPath(sid, roomId)}/object-review/suggest`, { detection_ids }),
-  whatIf: (sid: string, roomId: string, materials: Partial<RoomMaterials>) =>
-    post<RoomAcoustics>(`${acousticPath(sid, roomId)}/what-if`, materials),
+  whatIf: (sid: string, roomId: string, materials: Partial<RoomMaterials>, signal?: AbortSignal) =>
+    post<RoomAcoustics>(`${acousticPath(sid, roomId)}/what-if`, materials, signal),
+  voice: async (url: string, signal?: AbortSignal) => {
+    if (!url.startsWith("/audio/")) throw new Error("Invalid voice clip location.");
+    const response = await fetch(url, { signal });
+    if (!response.ok) throw new Error("Couldn’t load the voice clip. Try the clap.");
+    return response.arrayBuffer();
+  },
   newThread: (sid: string) => post<{ thread_id: string }>("/api/agent/threads", { sid }),
   send: (threadId: string, text: string) => post(`/api/agent/threads/${threadId}/messages`, { text }),
   agentEvents: (threadId: string) => new EventSource(`/api/agent/threads/${threadId}/events`),

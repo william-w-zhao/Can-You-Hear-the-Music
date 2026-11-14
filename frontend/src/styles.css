@@ -175,3 +175,26 @@ h2 { font-size: 1.2rem; line-height: 1.3; }
 .room-proposals li { border-top: 1px solid var(--line); padding: 12px 0; }
 .room-proposals label { display: flex; align-items: baseline; gap: 8px; }
 .room-proposals p { margin: 5px 0; }
+
+.sound-panel fieldset { padding: 0; border: 0; min-width: 0; }
+.sound-form, .listen-options {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr)); gap: 12px;
+}
+.sound-form label, .sound-room-select, .listen-options > div { display: grid; gap: 6px; }
+.sound-room-select { margin-top: 16px; max-width: 340px; }
+.sound-form select, .sound-form input, .sound-room-select select {
+  min-width: 0; padding: 7px; border: 1px solid var(--line); border-radius: 5px;
+  background: var(--surface); color: var(--ink); font: inherit;
+}
+.listen-options { margin-bottom: 14px; }
+.listen-options > div { border: 1px solid var(--line); padding: 12px; border-radius: 8px; }
+.listen-options span, .sound-panel .muted { color: var(--muted); font-size: .9rem; }
+.sound-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.sound-panel button {
+  padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--accent-light); color: var(--ink); font: inherit; cursor: pointer;
+}
+.sound-panel button:disabled { opacity: .6; cursor: default; }
+.echo-comparison { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: .9rem; }
+.echo-comparison caption { text-align: left; font-weight: 650; margin-bottom: 6px; }
+.echo-comparison :is(td, th) { text-align: left; padding: 7px 3px; border-bottom: 1px solid var(--line); }
