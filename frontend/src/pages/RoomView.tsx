@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api, type RoomAcoustics } from "../api";
+import { api, type AcousticDetails, type RoomAcoustics } from "../api";
 import { useData } from "../useData";
 import LoadState from "../components/LoadState";
 import EchoChart from "../components/EchoChart";
@@ -9,6 +9,8 @@ import WhatIf from "../components/WhatIf";
 import RoomComparison from "../components/RoomComparison";
 import RoomImages from "../components/RoomImages";
 import "../room.css";
+import { Dimensions, RoomInterior } from "../components/RoomEvidence";
+import RoomReview from "../components/RoomReview";
 
 export default function RoomView() {
   const { sid = "", rid = "" } = useParams();
@@ -23,6 +25,9 @@ function RoomWorkspace({ sid, rid }: { sid: string; rid: string }) {
     ]);
     return { details, plan };
   });
+  const [reviewed, setReviewed] = useState<AcousticDetails>();
+  const [reviewCount, setReviewCount] = useState(0);
+  const details = reviewed ?? data?.details;
   const [scenario, setScenario] = useState<RoomAcoustics>();
   const [compare, setCompare] = useState("");
   const comparison = useData(`${sid}/${compare}`, (signal) =>
@@ -30,11 +35,11 @@ function RoomWorkspace({ sid, rid }: { sid: string; rid: string }) {
   );
   const choices = useMemo(
     () =>
-      data
+      details
         ? [
             {
-              label: `As scanned / ${data.details.room.type}`,
-              room: data.details.room,
+              label: `As scanned / ${details.room.type}`,
+              room: details.room,
             },
             ...(scenario
               ? [{ label: "Material what-if", room: scenario }]
@@ -49,25 +54,19 @@ function RoomWorkspace({ sid, rid }: { sid: string; rid: string }) {
               : []),
           ]
         : [],
-    [data, scenario, comparison.data, compare],
+    [details, scenario, comparison.data, compare],
   );
-  const base = data?.details.room;
+  const base = details?.room;
   const geometry = data?.plan.rooms.find((room) => room.id === rid);
   return (
     <div className="room-page">
-      <header className="site-header">
-        <Link className="brand" to="/">
-          ≋ Hear the Space
-        </Link>
-        <span>ROOM ACOUSTICS / COMPARISON</span>
-      </header>
       <main>
         <Link className="back" to={`/b/${encodeURIComponent(sid)}`}>
           ← Back to floor plan
         </Link>
         <div className="eyebrow">LISTEN / 03</div>
         <h1>{base?.type || `Room ${rid}`}</h1>
-        {!data || !base ? (
+        {!data || !details || !base ? (
           <LoadState error={error} retry={retry} />
         ) : (
           <>
@@ -108,9 +107,38 @@ function RoomWorkspace({ sid, rid }: { sid: string; rid: string }) {
                 </span>
               </div>
             )}
-            <RoomImages sid={sid} rid={rid} name={base.type} plan={data.plan} />
+            {details.object_evidence?.views?.length ? (
+              <RoomInterior
+                key={reviewCount}
+                sid={sid}
+                roomId={rid}
+                evidence={details.object_evidence}
+              />
+            ) : (
+              <RoomImages
+                sid={sid}
+                rid={rid}
+                name={base.type}
+                plan={data.plan}
+              />
+            )}
+            {details.object_evidence && (
+              <RoomReview
+                sid={sid}
+                roomId={rid}
+                details={details}
+                onSave={(result) => {
+                  setReviewed(result);
+                  setScenario(undefined);
+                  setReviewCount((n) => n + 1);
+                }}
+              />
+            )}
+            {details.dimensions && (
+              <Dimensions dimensions={details.dimensions} />
+            )}
             <RoomComparison
-              baseline={data.details}
+              baseline={details}
               other={comparison.data}
               plan={data.plan}
               rid={rid}
@@ -119,17 +147,18 @@ function RoomWorkspace({ sid, rid }: { sid: string; rid: string }) {
               error={comparison.error}
               retry={comparison.retry}
             />
-            <Listen choices={choices} voiceUrl={data.details.voice_url} />
+            <Listen choices={choices} voiceUrl={details.voice_url} />
             <div className="workspace">
               <EchoChart
                 baseline={base}
                 scenario={scenario}
-                bands={data.details.bands_hz}
+                bands={details.bands_hz}
               />
               <WhatIf
+                key={reviewCount}
                 sid={sid}
                 rid={rid}
-                details={data.details}
+                details={details}
                 onResult={setScenario}
               />
             </div>

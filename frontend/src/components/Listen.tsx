@@ -10,7 +10,7 @@ export default function Listen({
   voiceUrl: string | null;
 }) {
   const context = useRef<AudioContext>();
-  const stopRef = useRef<() => void>(() => {});
+  const stopRef = useRef<() => void>();
   const controller = useRef<AbortController>();
   const generation = useRef(0);
   const clip = useRef<{ url: string; buffer: AudioBuffer }>();
@@ -21,7 +21,7 @@ export default function Listen({
   function stop() {
     generation.current++;
     controller.current?.abort();
-    stopRef.current();
+    stopRef.current?.();
     setLoading(false);
     setStatus("Stopped");
   }
@@ -32,10 +32,13 @@ export default function Listen({
     return () => {
       generation.current++;
       controller.current?.abort();
-      stopRef.current();
-      void context.current?.close();
+      stopRef.current?.();
+      const previous = context.current;
+      context.current = undefined;
+      if (previous && previous.state !== "closed")
+        void previous.close().catch(() => {});
     };
-  }, [choices]);
+  }, [choices, voiceUrl]);
   async function play(
     room: RoomAcoustics,
     label: string,
@@ -89,6 +92,7 @@ export default function Listen({
         .connect(compressor)
         .connect(c.destination);
       const cleanup = () => {
+        if (stopRef.current === cleanup) stopRef.current = undefined;
         try {
           source.stop();
         } catch {
@@ -119,23 +123,24 @@ export default function Listen({
             : "Audio is unavailable in this browser.",
         );
         setStatus("");
-        stopRef.current();
+        stopRef.current?.();
       }
     } finally {
       if (run === generation.current) setLoading(false);
     }
   }
   return (
-    <section className="panel listen">
-      <div className="eyebrow">PUT ON YOUR HEADPHONES</div>
-      <h2>Hear the difference.</h2>
-      <p>The same clip, the same gain. Switch between spaces and treatments.</p>
+    <section
+      className="panel listen details-panel sound-panel"
+      aria-labelledby="listen-heading"
+    >
+      <h2 id="listen-heading">Listen to the room</h2>
       <div className="listen-options">
         {choices.map(({ label, room }) => (
           <div key={label}>
             <strong>{label}</strong>
             <span>{room.rt60[1].toFixed(2)} s at 500 Hz</span>
-            <div className="actions">
+            <div className="actions sound-actions">
               <button
                 disabled={loading || !voiceUrl}
                 onClick={() => void play(room, label, "voice")}
@@ -144,7 +149,6 @@ export default function Listen({
               </button>
               <button
                 disabled={loading}
-                className="secondary"
                 onClick={() => void play(room, label, "clap")}
               >
                 ▶ Clap
@@ -153,15 +157,13 @@ export default function Listen({
           </div>
         ))}
       </div>
-      <button className="secondary" onClick={stop}>
-        Stop audio
-      </button>
+      <button onClick={stop}>Stop audio</button>
       <p role="status" aria-live="polite">
         {status}
       </p>
       {!voiceUrl && (
         <p className="muted">
-          The team's voice clip is not available. Clap playback still works.
+          Voice playback needs a demo clip. You can still play a clap.
         </p>
       )}
       {error && (
@@ -170,9 +172,7 @@ export default function Listen({
         </p>
       )}
       <p className="muted">
-        Synthetic reverberation from three-band echo times; not a room
-        recording. Tail length is capped at 3.5 seconds, following the
-        prototype.
+        Playback simulates reverberation from the estimated echo times.
       </p>
     </section>
   );

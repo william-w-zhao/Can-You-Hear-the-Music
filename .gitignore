@@ -10,8 +10,6 @@
 costar-hackathon-kit/
 # Shared cache: Matterport scans, panoramas, point clouds, Vexcel imagery, CoStar records per model
 data/
-# Images saved by the key check
-key-check/out/
 # Any stray data files, wherever they end up
 *.jsonl
 *.csv
@@ -31,3 +29,6 @@ __pycache__/
 node_modules/
 frontend/dist/
 .DS_Store
+
+# Local YOLO configuration and weights (never served as scan data)
+.vision-cache/

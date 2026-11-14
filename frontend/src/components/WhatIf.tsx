@@ -18,7 +18,7 @@ export default function WhatIf({
   onResult: (room?: RoomAcoustics) => void;
 }) {
   const base = details.room;
-  const initial: RoomMaterials = {
+  const initial: Omit<RoomMaterials, "type"> = {
     floor: base.floor,
     ceiling: base.ceiling,
     walls: base.walls,

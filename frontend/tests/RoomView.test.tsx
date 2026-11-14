@@ -4,6 +4,108 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Routes, Route, Link } from "react-router-dom";
 import RoomView from "../src/pages/RoomView";
 import { details, plan, second } from "./fixtures";
+import type { AcousticDetails } from "../src/api";
+
+it("retains William's panorama evidence and applies approved reviews to the comparison baseline", async () => {
+  const evidence: AcousticDetails = {
+    ...details,
+    can_run_room_review: true,
+    object_evidence: {
+      status: "complete",
+      image_url: "/data/office/room_sheet.jpg",
+      image_width: 1270,
+      image_height: 400,
+      views: [
+        {
+          name: "Wall 1",
+          viewport: [470, 0, 200, 200],
+          photo_url: "/api/buildings/office/rooms/r1/acoustics/photos/1",
+        },
+      ],
+      detections: [
+        {
+          id: "chair1",
+          label: "Chair",
+          confidence: 0.9,
+          needs_review: false,
+          view: "Wall 1",
+          box_px: [10, 10, 50, 50],
+          sheet_box_px: [480, 10, 520, 50],
+        },
+      ],
+    },
+    dimensions: {
+      length_m: 4,
+      width_m: 4,
+      height_m: 3,
+      area_m2: 16,
+      volume_m3: 48,
+      footprint_source: "matterport",
+      height_source: "assumed",
+    },
+  };
+  const reviewed = {
+    ...evidence,
+    room: {
+      ...evidence.room,
+      floor: "carpet_on_pad",
+      rt60: [0.5, 0.3, 0.2],
+      verdict: "Excellent for calls",
+    },
+  };
+  const fetcher = vi.fn(async (path: string) => {
+    if (path.endsWith("/room-review/approve")) return Response.json(reviewed);
+    if (path.endsWith("/room-review"))
+      return Response.json({
+        revision: "rev1",
+        proposals: [
+          {
+            target: "floor",
+            value: "carpet_on_pad",
+            view: "Wall 1",
+            reason: "Visible carpet",
+          },
+        ],
+        descriptions: { floor: "Floor material" },
+      });
+    if (path.endsWith("/what-if")) return Response.json(second.room);
+    if (path.endsWith("/rooms")) return Response.json(plan);
+    return Response.json(evidence);
+  });
+  vi.stubGlobal("fetch", fetcher);
+  mount();
+  await screen.findByRole("heading", { name: "Room interior" });
+  expect(
+    screen.getByRole("group", { name: "Matterport panorama · Wall 1" }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "Chair, 90% model score" }),
+  ).toBeInTheDocument();
+  expect(screen.getByText(/Ceiling height is assumed/)).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Apply what-if" }));
+  await screen.findByText("Material what-if");
+  await userEvent.click(
+    screen.getByRole("button", { name: "Review this room" }),
+  );
+  await userEvent.click(
+    await screen.findByRole("checkbox", { name: "Carpet on pad" }),
+  );
+  await userEvent.click(
+    screen.getByRole("button", { name: "Apply selected changes" }),
+  );
+  await screen.findByText(
+    "Review saved. The room reflects your approved changes.",
+  );
+  expect(screen.queryByText("Material what-if")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("floor")).toHaveValue("carpet_on_pad");
+  expect(fetcher).toHaveBeenCalledWith(
+    "/api/buildings/office/rooms/r1/acoustics/room-review/approve",
+    expect.objectContaining({
+      method: "POST",
+      body: expect.stringContaining("rev1"),
+    }),
+  );
+});
 
 function mount() {
   return render(

@@ -2,6 +2,8 @@ import type { AcousticDetails, BuildingRooms } from "../src/api";
 
 // Deliberately synthetic contract fixtures; no licensed demo data is committed.
 export const details: AcousticDetails = {
+  dimensions: null,
+  object_evidence: { status: "pending" },
   bands_hz: ["125", "500", "2000"],
   voice_url: null,
   material_options: {

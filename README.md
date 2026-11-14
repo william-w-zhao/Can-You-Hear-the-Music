@@ -31,7 +31,7 @@ Can You Hear the Music/
 │   ├── public/audio/             dry voice clip for listening
 │   └── prototypes/               working explorer and acoustics demo pages
 ├── data/                         shared cache, one folder per scanned model (git-ignored)
-├── key-check/                    API/SDK key tests; holds .env with the keys (git-ignored)
+├── .env.example                  template for the local root .env (git-ignored)
 └── costar-hackathon-kit/         CoStar's data kit (read-only, git-ignored)
 ```
 
@@ -40,8 +40,8 @@ Can You Hear the Music/
 1. **Pick a building.** `GET /api/buildings` lists scanned buildings from the kit and marks which scans have analysis ready.
    Exclude outdoor-only scans such as pools and courtyards.
 2. **Pick a room.** `GET /api/buildings/{sid}/rooms` returns the room outlines. If the building hasn't been
-   analysed yet, `POST /api/buildings/{sid}/analyse` runs download → point cloud → room split → materials →
-   acoustics as a background job, with progress streamed to the page.
+   analysed yet, `POST /api/buildings/{sid}/analyse` prepares geometry, runs optional YOLO detection, reviews
+   material labels and calculates acoustics. The page polls the background job for progress.
 3. **Hear the room.** `GET /api/buildings/{sid}/rooms/{room_id}/acoustics` returns echo times, materials and impulse-response settings.
    The browser plays the voice with Web Audio, using the echo times returned by the backend. The what-if endpoint recomputes those times after a material change.
 
@@ -68,9 +68,8 @@ Rule: **the agent decides, the code computes.** Every number the agent states co
    Can You Hear the Music/
    ├── backend/
    ├── frontend/
-   ├── key-check/
-   │   ├── .env.example
-   │   └── .env                  create locally
+   ├── .env.example
+   ├── .env                      create locally
    └── costar-hackathon-kit/
        ├── commercial-properties.csv
        ├── residential-listings.csv
@@ -78,27 +77,31 @@ Rule: **the agent decides, the code computes.** Every number the agent states co
        └── schemas/
    ```
 
-2. Create the local credentials file from the template. If `key-check/.env` already exists, edit it directly.
+2. Create the local credentials file at the project root. If `.env` already exists, edit it directly.
 
    ```bash
-   cp -n key-check/.env.example key-check/.env
+   cp -n .env.example .env
    ```
 
    Fill in `MATTERPORT_API_KEY` and `MATTERPORT_API_TOKEN` for scan downloads, `VEXCEL_API_KEY` for aerial
    imagery, and `MATTERPORT_SDK_KEY` for the browser's Showcase viewer. Use `COSTAR_ZIP_PASSWORD` to unlock
    the archive if needed. The unpacked kit is read from disk. The hackathon site username and password are
-   optional. The backend checks shell environment variables first, then a root `.env`, then `key-check/.env`.
-   The key-check scripts read `key-check/.env` and shell variables. Keep credentials and the kit out of Git.
+   optional. The backend checks shell environment variables first, then the root `.env`.
+   Keep credentials and the kit out of Git.
 
-3. Set up Python from the repository root, then check access to Matterport, Vexcel and the CoStar kit.
+3. Set up Python from the repository root.
 
    ```bash
    cd backend
    python3 -m venv .venv
    source .venv/bin/activate
    python -m pip install -r requirements.txt
-   python ../key-check/test_keys.py
    ```
+
+   For local object and roof detection, also run `python -m pip install -r requirements-vision.txt` from
+   `backend/`. The first run downloads YOLO and CLIP weights into the ignored `.vision-cache/` folder.
+   Detection runs locally. Model suggestions use either `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`.
+   You can use the manual review form without configuring a model.
 
 4. To try the existing office and house acoustics, copy `data/hLR2zAFV1tK/` and `data/zvKHR9DHNjJ/` into the
    clone's root `data/` directory through the team's private channel. For the acoustics prototype's building
@@ -115,11 +118,32 @@ Rule: **the agent decides, the code computes.** Every number the agent states co
    On your teammate's machine, open [the API health check](http://localhost:8000/api/health) and then
    [Swagger](http://localhost:8000/docs). For a copied demo cache, try
    [the office room list](http://localhost:8000/api/buildings/hLR2zAFV1tK/rooms). These cached reads use local
-   files. The API keys are used by the download pipeline and key checks.
+   files. The API keys are used by scan downloads and model review.
 
 ## Run
 
-The target app serves cached scans. New-scan analysis and agent routes are still scaffolds.
+To analyse a single-floor scan, clear **Rooms available only**, open a building, and select
+**Analyse building**. The page shows the current stage and opens the room picker when results are ready.
+With a model key set, the pipeline can suggest labels from the room panoramas.
+Use the review form to complete missing or uncertain labels.
+Completed files are reused on retry. The job status lives in the current backend process.
+
+On a room page, **Review this room** runs Deep Agents with the configured model.
+It inspects the panorama and proposes surface materials, duplicate decisions, and fixes for low-scoring
+YOLO labels. Select the proposals to apply. Approved changes are saved by scan in `room_reviews.json`
+and approved material changes update the displayed echo estimate.
+
+Set the provider key in the root `.env`. Set `REVIEW_MODEL` to switch the provider
+or use a different model. Use a model that supports images, tool calls, and structured outputs.
+
+| Provider | Key variable | Example `REVIEW_MODEL` |
+| --- | --- | --- |
+| OpenAI | `OPENAI_API_KEY` | `openai:gpt-5.6-terra` |
+| Anthropic | `ANTHROPIC_API_KEY` | `anthropic:claude-sonnet-4-6` |
+
+If `REVIEW_MODEL` is blank, the backend uses the configured provider and prefers Anthropic when both keys
+are present. The room review panel shows the selected model. When editing a local `.env` file, refresh the
+room page to see the change. If you set shell environment variables, restart the backend.
 
 ```bash
 cd backend && python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt && uvicorn app.main:app --reload --port 8000
@@ -153,8 +177,9 @@ including the hourly street-noise slider and the agent.
 | Component | Code and inputs | Output or consumer |
 |---|---|---|
 | Building data | `backend/app/sources/` and `app/pipeline/fetch_building.py` read the CoStar kit, Matterport and aerial imagery | Catalog and `data/<sid>/bundle.json` with scan metadata, panoramas and floor-plan files |
-| Room geometry | `app/pipeline/pointcloud.py` and `rooms.py` use Matterport outlines or split a point cloud | `rooms.json` with floor-plan pixels, room dimensions and panorama IDs |
-| Material annotation | `app/pipeline/materials.py` will use YOLO to locate furniture and Claude vision to classify acoustic surfaces | `materials.json` keyed by room ID, with editable labels, confidence and image references |
+| Room geometry | `app/pipeline/rooms.py` uses Matterport outlines or splits a point cloud; `dimensions.py` converts outlines into metre spans | `rooms.json`, plus room dimensions and measurement sources in the room API |
+| Visual evidence | `app/pipeline/vision.py` runs YOLO on Matterport panorama faces and tiles from the Vexcel aerial | `vision.json` with room object evidence and aerial roof candidates |
+| Material annotation | `app/pipeline/materials.py` gives Claude the room image and YOLO label hints when a key is configured | `materials.json` keyed by room ID, with a review form for missing or doubtful labels |
 | Acoustic engine | `app/pipeline/acoustics.py` combines geometry and materials | Three-band RT60, a mid-band range and treatment results for API and agent tools |
 | Street noise | Add traffic data ingestion under `app/sources/` and indoor estimates under `app/pipeline/` | A sourced 24-hour estimate per room for the chart, audio mixer and agent |
 | API and jobs | `backend/app/api/` reads cached outputs, validates changes and streams work in progress | Typed responses and server-sent events for `frontend/src/api.ts` |
@@ -216,28 +241,31 @@ Keep the prototypes available until the React dashboard covers the demo flow.
 **Done when** the dashboard shows the source and assumptions behind the estimate and a listener can hear the
 difference between 2 a.m. and 8 a.m. The traffic-data work can begin alongside the dashboard.
 
-### 4. Automate material labels and analyse a new scan
+### 4. Measure rooms, detect objects and review the evidence
 
-1. In `pipeline/materials.py`, use the room's panorama IDs to fetch the six skybox faces of a representative
-   panorama. Run [YOLO detection](https://docs.ultralytics.com/modes/predict) on each face to locate common
-   furniture such as chairs and couches. Keep each detection's label, confidence, bounding box, panorama ID
-   and face index so the agent can retrieve the crop later. Use detections to inform the room's coarse
-   furnishing category.
-2. Send the faces and relevant detections in a structured Claude vision request using `ANTHROPIC_API_KEY`.
-   Classify acoustically important surfaces such as carpet, ceiling tile, acoustic panels and glazing. Return
-   floor, ceiling, walls and furnishing labels using the engine's existing keys, with confidence and evidence
-   references. Estimate glass area from room geometry where possible and record any assumptions.
-3. Compare predictions with the hand labels in both demo buildings. Flag low-confidence or missing labels
-   that could change the acoustic result, and preserve confirmed corrections on retry.
-4. Implement `POST /api/buildings/{sid}/analyse` and the job endpoints in `api/jobs.py`. Run download,
-   geometry, material labels and acoustics in that order. Use Matterport outlines where suitable and point-cloud
-   segmentation as the other path. Stream stage changes and failures to the dashboard and reuse completed
-   outputs on retry.
-5. Run the flow on a previously uncached scan. Check the room polygons against the floor plan, especially near
-   windows. Verify floor selection before using a multi-floor scan in the demo.
+1. Prepare the room outlines from Matterport or segment the point cloud. Length and width are the sides of
+   the smallest rotated rectangle that fits the outline. Area still follows the room shape, so multiplying
+   the two spans may overstate the area of an irregular room. The room page labels the ceiling height source
+   so scan dimensions, point cloud estimates and assumptions can be distinguished.
+2. Run [YOLO-World](https://docs.ultralytics.com/models/yolo-world/) on the six faces of one representative
+   Matterport panorama per room. Save labels, scores, boxes and face indices to `vision.json`. New caches
+   also record the contact sheet's panorama ID; older sheets retain the image and box references. A repeated
+   label across faces does not imply multiple objects. The room page lets you inspect the original views and
+   see which detections need review.
+3. Run the same detector on overlapping tiles from Vexcel's `ortho.png` with roof labels. Convert boxes
+   back to full image pixels and remove overlapping duplicates. Show roof candidates on the building page
+   and report available OpenStreetMap outlines separately. Roof boxes still need validation against mapped
+   or hand labeled footprints before using them as obstacles in a noise model.
+4. If enabled, Claude gets the room image and the YOLO hints to help classify materials and furnishing.
+   The review form also shows those hints. Existing manual labels are reused, and YOLO boxes do not directly
+   set material coefficients or glass area.
+5. Validate the dimensions and detections on one house and one office. Compare visible items and roof boxes
+   with hand labels; use those examples to tune thresholds. Then validate the whole flow on a previously
+   uncached scan. Automatic geometry preparation currently supports single-floor scans.
 
-**Done when** a user can start analysis from the picker, see progress, review doubtful labels and play a room
-when the job finishes.
+For a previously analysed scan, select **Run image analysis** on the building page or run
+`python -m app.pipeline.vision --model <sid> --refresh` from `backend/` with the virtual environment active.
+This reuses `rooms.json` and local imagery rather than starting a new scan download.
 
 ### 5. Add the deepagents workflow
 
@@ -273,7 +301,7 @@ tool results behind its recommendation. If it recommends the cheapest treatment,
    backup video before submission.
 4. Prepare the Devpost submission for the CoStar, main and LangChain deepagents tracks. Review `git status`
    before pushing. Keep `data/`, the CoStar kit and real `.env`
-   files out of Git. Each teammate can populate `key-check/.env` from `key-check/.env.example` using keys
+   files out of Git. Each teammate can populate `.env` from `.env.example` using keys
    shared privately.
 
 ## Rules for adding code

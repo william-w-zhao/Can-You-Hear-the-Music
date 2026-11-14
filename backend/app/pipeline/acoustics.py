@@ -16,6 +16,7 @@ import json
 import math
 import subprocess
 
+from app.pipeline.cache_files import write_json
 from app.sources.config import AUDIO, DATA
 
 BANDS = ["125", "500", "2000"]
@@ -112,7 +113,10 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--model", required=True)
     a = ap.parse_args()
-    d = DATA / a.model
+    analyse_acoustics(a.model, DATA / a.model)
+
+
+def analyse_acoustics(sid, d):
     rooms = json.loads((d / "rooms.json").read_text())
     mats = json.loads((d / "materials.json").read_text())
     out = []
@@ -126,11 +130,11 @@ def main():
         print(f"  {r['id']:4} {m['type']:24} {r['area_m2']:6.1f} m²  RT60 {t[0]:.2f}/{t[1]:.2f}/{t[2]:.2f} s "
               f"(mid range {lo:.2f}-{hi:.2f})  furnished {tf[1]:.2f} s  → {metrics['verdict']}")
     voice = dry_voice()
-    res = {"model": a.model, "bands_hz": BANDS, "materials": MATERIALS, "contents": CONTENTS,
+    res = {"model": sid, "bands_hz": BANDS, "materials": MATERIALS, "contents": CONTENTS,
            "air_m_2k": AIR_M_2K, "verdicts": VERDICTS, "rooms": out, "floorplan": rooms["floorplan"],
            "segmentation": rooms["method"], "materials_source": mats["labelled_by"],
            "voice": "audio/voice.wav" if voice.exists() else None}
-    (d / "acoustics.json").write_text(json.dumps(res, indent=1))
+    write_json(d / "acoustics.json", res)
     print(f"Saved {d / 'acoustics.json'}")
 
 
