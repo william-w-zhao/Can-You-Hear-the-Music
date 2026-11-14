@@ -1,5 +1,4 @@
 """Group YOLO detections across the six faces of one Matterport panorama."""
-from collections import Counter
 from hashlib import sha256
 from itertools import combinations
 import json
@@ -52,51 +51,94 @@ def box_overlap(first, second):
     return intersection / union if union else 0
 
 
-def group_detections(raw_hits, size, decisions):
-    """Return evidence groups and unresolved pairs without treating them as a verified count."""
-    hits = {detection_id(hit): hit for hit in raw_hits}
-    saved = {tuple(key.split(":")): value for key, value in decisions.items()}
-    saved = {pair: value for pair, value in saved.items() if len(pair) == 2 and all(i in hits for i in pair)}
+def containment(first, second):
+    """Share of the smaller box that lies inside the larger one."""
+    a, b = first["box_px"], second["box_px"]
+    intersection = max(0, min(a[2], b[2]) - max(a[0], b[0])) * max(0, min(a[3], b[3]) - max(a[1], b[1]))
+    smaller = min((a[2] - a[0]) * (a[3] - a[1]), (b[2] - b[0]) * (b[3] - b[1]))
+    return intersection / smaller if smaller else 0
+
+
+# YOLO-World often gives one object two related labels; these count as the same kind of object.
+FAMILIES = {"sofa": "seating", "chair": "seating", "table": "surface", "desk": "surface",
+            "cabinet": "storage", "bookshelf": "storage", "window": "opening", "curtain": "opening"}
+
+
+def family(label):
+    return FAMILIES.get(label, label)
+
+
+def seam_fit(a, b, size):
+    """(gap, overlap) where two boxes on adjacent faces meet at their shared panorama edge, else None."""
+    faces = a["face_index"], b["face_index"]
+    if faces not in SEAMS:
+        return None
+    edge_a, edge_b, reversed_edge = SEAMS[faces]
+    gap_a, span_a = edge_interval(a, edge_a, size)
+    gap_b, span_b = edge_interval(b, edge_b, size)
+    if reversed_edge:
+        span_b = 1 - span_b[1], 1 - span_b[0]
+    return max(gap_a, gap_b), overlap_ratio(span_a, span_b)
+
+
+def candidate_pairs(hits, size):
+    """Pairs of detections that may show one physical object: {pair: (kind, strong, strength, reason)}."""
     pairs = {}
-    competition = Counter()
     for first, second in combinations(hits, 2):
         a, b = hits[first], hits[second]
-        pair = tuple(sorted((first, second)))
         if a.get("panorama_id") != b.get("panorama_id"):
             continue
+        pair = tuple(sorted((first, second)))
+        related = family(a["label"]) == family(b["label"])
+        if a["face_index"] == b["face_index"]:
+            iou, inside = box_overlap(a, b), containment(a, b)
+            if iou >= 0.85:
+                reason = "the same box with two labels" if a["label"] != b["label"] else "overlapping boxes in one view"
+                pairs[pair] = ("face", True, iou, reason)
+            elif related and (iou >= 0.5 or inside >= 0.85):
+                pairs[pair] = ("face", True, max(iou, inside), "a smaller box inside a larger one")
+            elif iou >= 0.5:
+                pairs[pair] = ("face", False, iou, "overlapping boxes with different labels")
+            continue
+        if not related:
+            continue
         if a["face_index"] > b["face_index"]:
-            first, second, a, b = second, first, b, a
-        faces = a["face_index"], b["face_index"]
-        if faces[0] == faces[1]:
-            if box_overlap(a, b) >= 0.80:
-                pairs[pair] = (False, None, "overlapping boxes in one view")
+            a, b = b, a
+        fit = seam_fit(a, b, size)
+        if fit is None:
             continue
-        if a["label"] != b["label"] or faces not in SEAMS:
+        gap, overlap = fit
+        if gap > 0.06 or overlap < 0.35:
             continue
-        edge_a, edge_b, reversed_edge = SEAMS[faces]
-        gap_a, span_a = edge_interval(a, edge_a, size)
-        gap_b, span_b = edge_interval(b, edge_b, size)
-        if reversed_edge:
-            span_b = 1 - span_b[1], 1 - span_b[0]
-        overlap = overlap_ratio(span_a, span_b)
-        if max(gap_a, gap_b) > 0.06 or overlap < 0.35:
-            continue
-        keys = ((first, faces[1]), (second, faces[0]))
-        if saved.get(pair) != "separate":
-            competition.update(keys)
-        strong = max(gap_a, gap_b) <= 0.025 and overlap >= 0.70 and not (a["needs_review"] or b["needs_review"])
-        pairs[pair] = (strong, keys, "boxes meet at a panorama edge")
+        pairs[pair] = ("seam", gap <= 0.04 and overlap >= 0.6, overlap, "the boxes meet where two views join")
+    return pairs
 
+
+def group_detections(raw_hits, size, decisions):
+    """Group detections that show one physical object, and list the pairs a person should check.
+
+    1. Saved decisions win: "same" always joins two boxes, "separate" never lets them join.
+    2. Within one view, a box nested inside another (or the same box with two labels) is one object.
+    3. Across a seam between two views, boxes that meet edge to edge join when that is the only
+       candidate on each side and at least one box has a confident score.
+    Everything else that could be the same object becomes a review. Groups are evidence, not a verified count.
+    """
+    hits = {detection_id(hit): hit for hit in raw_hits}
+    order = {key: index for index, key in enumerate(hits)}
+    saved = {tuple(sorted(key.split(":"))): value for key, value in decisions.items()}
+    saved = {pair: value for pair, value in saved.items() if len(pair) == 2 and all(i in hits for i in pair)}
+    pairs = candidate_pairs(hits, size)
     separate = {frozenset(pair) for pair, value in saved.items() if value == "separate"}
-    groups = {key: {key} for key in hits}
+    groups = {key: frozenset((key,)) for key in hits}
 
-    def merge(first, second, automatic=False):
+    def faces(group):
+        return {hits[key]["face_index"] for key in group}
+
+    def merge(first, second):
         left, right = groups[first], groups[second]
-        if left is right:
+        if left == right:
             return True
         if any(frozenset((a, b)) in separate for a in left for b in right):
-            return False
-        if automatic and {hits[i]["face_index"] for i in left} & {hits[i]["face_index"] for i in right}:
             return False
         combined = left | right
         for key in combined:
@@ -107,27 +149,77 @@ def group_detections(raw_hits, size, decisions):
         if value == "same" and not merge(*pair):
             raise ValueError("That decision conflicts with an existing object match. Undo the other decision first.")
 
-    for pair, (strong, keys, _) in pairs.items():
-        if pair not in saved and strong and all(competition[key] == 1 for key in keys):
-            merge(*pair, automatic=True)
+    # Same-view duplicates first, so each object is one group before matching across views.
+    for pair, (kind, strong, _, _) in sorted(pairs.items(), key=lambda item: -item[1][2]):
+        if kind == "face" and strong and pair not in saved:
+            merge(*pair)
 
-    reviews = []
-    for pair in pairs.keys() | saved.keys():
+    # Across a seam, merge only when each group has exactly one candidate group on the other view.
+    seam = [(pair, value) for pair, value in pairs.items() if value[0] == "seam" and saved.get(pair) != "separate"]
+    partners = {}
+    for (first, second), _ in seam:
+        for mine, theirs in ((first, second), (second, first)):
+            partners.setdefault((groups[mine], hits[theirs]["face_index"]), set()).add(groups[theirs])
+    for pair, (_, strong, _, _) in sorted(seam, key=lambda item: -item[1][2]):
+        first, second = pair
+        left, right = groups[first], groups[second]
+        if not strong or pair in saved or left == right or faces(left) & faces(right):
+            continue
+        unique = (len(partners.get((left, hits[second]["face_index"]), ())) == 1 and
+                  len(partners.get((right, hits[first]["face_index"]), ())) == 1)
+        if unique and not all(hits[key]["needs_review"] for key in left | right):
+            merge(*pair)
+
+    # One review per pair of groups; skip pairs where both sides are only low-score boxes.
+    reviews, seen = [], set()
+    for pair in sorted(pairs.keys() | saved.keys(), key=lambda p: (saved.get(p) is None, -pairs.get(p, ("", False, 0))[2])):
         first, second = pair
         decision = saved.get(pair)
-        if decision or groups[first] is not groups[second]:
-            reviews.append({"id": ":".join(pair), "detection_ids": pair, "decision": decision,
-                            "reason": pairs.get(pair, (None, None, "saved review"))[2]})
+        key = frozenset((groups[first], groups[second]))
+        if decision is None:
+            if groups[first] == groups[second] or key in seen:
+                continue
+            if all(hits[i]["needs_review"] for i in groups[first] | groups[second]):
+                continue
+        seen.add(key)
+        reviews.append({"id": ":".join(pair), "detection_ids": pair, "decision": decision,
+                        "reason": pairs[pair][3] if pair in pairs else "saved decision"})
 
-    pending = {key for review in reviews if review["decision"] is None for key in review["detection_ids"]}
-    order = {key: index for index, key in enumerate(hits)}
+    pending = {key for review in reviews if review["decision"] is None
+               for group in (groups[review["detection_ids"][0]], groups[review["detection_ids"][1]]) for key in group}
     result = []
-    for keys in {frozenset(group) for group in groups.values()}:
-        lead = min(keys, key=order.get)
+    for keys in set(groups.values()):
         ordered = sorted(keys, key=order.get)
-        result.append({"id": lead, "label": hits[lead]["label"], "detection_ids": ordered,
+        # Name the group after its most confident box.
+        lead = max(ordered, key=lambda key: hits[key]["confidence"])
+        result.append({"id": ordered[0], "label": hits[lead]["label"], "detection_ids": ordered,
+                       "views": sorted({hits[key]["view"] for key in keys if "view" in hits[key]}),
+                       "confidence": max(hits[key]["confidence"] for key in keys),
                        "status": "needs_match" if pending & keys else
                        "low_score" if all(hits[key]["needs_review"] for key in keys) else "estimated"})
-    reviews.sort(key=lambda review: (review["decision"] is not None, review["id"]))
-    result.sort(key=lambda group: order[group["id"]])
+    reviews.sort(key=lambda review: review["decision"] is not None)
+    result.sort(key=lambda group: (group["status"] == "low_score", -group["confidence"], order[group["id"]]))
     return {"groups": result, "reviews": reviews}
+
+
+def merge_decisions(raw_hits, size, decisions, detection_ids):
+    """Decisions that join all the given detections into one object (dropping any "separate" among them)."""
+    ids = list(dict.fromkeys(detection_ids))
+    chosen = set(ids)
+    updated = {key: value for key, value in decisions.items()
+               if not (value == "separate" and set(key.split(":")) <= chosen)}
+    for other in ids[1:]:
+        updated[":".join(sorted((ids[0], other)))] = "same"
+    group_detections(raw_hits, size, updated)          # raises ValueError on a conflict
+    return updated
+
+
+def split_decisions(raw_hits, size, decisions, detection_ids):
+    """Decisions that keep each of the given detections as its own object."""
+    chosen = set(detection_ids)
+    updated = {key: value for key, value in decisions.items()
+               if not (value == "same" and set(key.split(":")) <= chosen)}
+    for first, second in combinations(sorted(chosen), 2):
+        updated[f"{first}:{second}"] = "separate"
+    group_detections(raw_hits, size, updated)
+    return updated

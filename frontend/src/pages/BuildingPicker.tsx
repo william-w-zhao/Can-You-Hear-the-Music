@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api, type BuildingSummary } from "../api";
 import { useRequest } from "../useRequest";
+import { LoadingBlock } from "../components/Spinner";
 
 const PAGE_SIZE = 24;
 const loadBuildings = () => api.buildings();
@@ -54,7 +55,7 @@ export default function BuildingPicker() {
     <main>
       <h1>Choose a building</h1>
       <p className="intro">Open a building to explore its floor plan and room acoustics.</p>
-      {state.status === "loading" && <p role="status">Loading buildings…</p>}
+      {state.status === "loading" && <LoadingBlock label="Loading buildings" />}
       {state.status === "error" && (
         <p role="alert">Couldn’t load buildings. <button onClick={retry}>Try again</button></p>
       )}

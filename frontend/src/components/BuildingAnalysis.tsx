@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, type AnalysisJob, type RoomMaterials } from "../api";
+import Spinner from "./Spinner";
 
 type Props = { sid: string; initialJobId?: string; onReady: () => void; visionOnly?: boolean };
 type Review = NonNullable<AnalysisJob["review"]>;
@@ -135,9 +136,13 @@ export default function BuildingAnalysis({ sid, initialJobId, onReady, visionOnl
   return (
     <section className="details-panel" aria-labelledby="analysis-title">
       <h2 id="analysis-title">{visionOnly ? "Image analysis" : "Building analysis"}</h2>
-      <p role="status">{job?.message || (jobId ? "Checking analysis progress…" : visionOnly
-        ? "Look for objects in the room panoramas and roofs in the aerial image."
-        : "Prepare room outlines, detect objects and estimate echo times for this scan.")}</p>
+      {jobId && (!job || job.status === "running") ? (
+        <Spinner label={job?.message || "Checking analysis progress"} />
+      ) : (
+        <p role="status">{job?.message || (visionOnly
+          ? "Look for objects in the room panoramas and roofs in the aerial image."
+          : "Prepare room outlines, detect objects and estimate echo times for this scan.")}</p>
+      )}
       {error && <p className="intro" role="alert">{error}</p>}
       {(!jobId || job?.status === "failed") && (
         <button className="show-more" disabled={busy} onClick={() => void start()}>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, type RoomAcoustics } from "../api";
 import { clap, impulse } from "../audio";
+import Spinner from "./Spinner";
 
 export default function Listen({
   choices,
@@ -156,9 +157,11 @@ export default function Listen({
       <button onClick={stop}>
         Stop audio
       </button>
-      <p role="status" aria-live="polite">
-        {status}
-      </p>
+      {loading ? <Spinner size="small" label="Preparing audio" /> : (
+        <p role="status" aria-live="polite">
+          {status}
+        </p>
+      )}
       {!voiceUrl && (
         <p className="muted">
           Voice playback needs a demo clip. You can still play a clap.
