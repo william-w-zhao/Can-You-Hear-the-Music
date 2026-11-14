@@ -39,6 +39,8 @@ def main():
     outdir.mkdir(parents=True, exist_ok=True)
     bundle = {"sid": sid, "fetched_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "errors": []}
 
+    # Matterport supplies the scan coordinates. Reuse one bounding box for the
+    # aerial image, OpenStreetMap outlines and nearby CoStar properties so they align.
     lat, lon = fetch_matterport(sid, outdir, bundle)
     box = Box(lat, lon, HALF_M, SIZE_PX)
     for step in (lambda: fetch_site(sid, bundle), lambda: fetch_vexcel(box, outdir, bundle),
@@ -48,6 +50,7 @@ def main():
         except Exception as e:
             log(f"  ! {e}")
             bundle["errors"].append(str(e))
+    # Keep source metadata together while storing the actual images beside the JSON.
     (outdir / "bundle.json").write_text(json.dumps(bundle, indent=1, default=str))
     idx = DATA / "index.json"
     models = json.loads(idx.read_text()) if idx.exists() else {}

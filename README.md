@@ -57,9 +57,69 @@ Can You Hear the Music/
 
 Rule: **the agent decides, the code computes.** Every number the agent states comes from a pipeline function.
 
+## Teammate setup
+
+1. Clone the repository and open a terminal in its root, where this README lives. Get the CoStar hackathon
+   kit and API credentials through the team's private channel or the event's `/costar-keys` Discord command.
+   Extract the kit as `costar-hackathon-kit/` next to `backend/` and `frontend/`. Both CSVs should be directly
+   inside that folder, with the kit's `data/` and `schemas/` directories alongside them.
+
+   ```text
+   Can You Hear the Music/
+   ├── backend/
+   ├── frontend/
+   ├── key-check/
+   │   ├── .env.example
+   │   └── .env                  create locally
+   └── costar-hackathon-kit/
+       ├── commercial-properties.csv
+       ├── residential-listings.csv
+       ├── data/
+       └── schemas/
+   ```
+
+2. Create the local credentials file from the template. If `key-check/.env` already exists, edit it directly.
+
+   ```bash
+   cp -n key-check/.env.example key-check/.env
+   ```
+
+   Fill in `MATTERPORT_API_KEY` and `MATTERPORT_API_TOKEN` for scan downloads, `VEXCEL_API_KEY` for aerial
+   imagery, and `MATTERPORT_SDK_KEY` for the browser's Showcase viewer. Use `COSTAR_ZIP_PASSWORD` to unlock
+   the archive if needed. The unpacked kit is read from disk. The hackathon site username and password are
+   optional. The backend checks shell environment variables first, then a root `.env`, then `key-check/.env`.
+   The key-check scripts read `key-check/.env` and shell variables. Keep credentials and the kit out of Git.
+
+3. Set up Python from the repository root, then check access to Matterport, Vexcel and the CoStar kit.
+
+   ```bash
+   cd backend
+   python3 -m venv .venv
+   source .venv/bin/activate
+   python -m pip install -r requirements.txt
+   python ../key-check/test_keys.py
+   ```
+
+4. To try the existing office and house acoustics, copy `data/hLR2zAFV1tK/` and `data/zvKHR9DHNjJ/` into the
+   clone's root `data/` directory through the team's private channel. For the acoustics prototype's building
+   selector and voice playback, also copy `data/index.json` and `frontend/public/audio/voice.wav` to their
+   matching paths. These files are Git-ignored. The kit supplies the building catalog, which the API can build
+   on the first building-list request. The room analysis and audio come from the demo cache.
+
+5. From `backend/` with the virtual environment active, start the server and leave the terminal running.
+
+   ```bash
+   python -m uvicorn app.main:app --reload --port 8000
+   ```
+
+   On your teammate's machine, open [the API health check](http://localhost:8000/api/health) and then
+   [Swagger](http://localhost:8000/docs). For a copied demo cache, try
+   [the office room list](http://localhost:8000/api/buildings/hLR2zAFV1tK/rooms). These cached reads use local
+   files. The API keys are used by the download pipeline and key checks.
+
 ## Run
 
-Target app (skeleton: routes answer 501 until they are ported):
+The target app serves cached scans. New-scan analysis and agent routes are still scaffolds.
 
 ```bash
 cd backend && python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt && uvicorn app.main:app --reload --port 8000
@@ -83,8 +143,8 @@ cd backend && source .venv/bin/activate && python3 -m prototypes.acoustics  # ht
 
 Start with the cached office suite (`hLR2zAFV1tK`, 11 rooms), then check the same flow on the 1920 house
 (`zvKHR9DHNjJ`, 13 rooms). The prototypes already split rooms, estimate echo from hand-labeled materials and
-play a voice with Web Audio. The FastAPI feature routes and React views are still scaffolds. The first milestone
-is a dashboard that can compare two office rooms and play a material what-if using cached data.
+play a voice with Web Audio. The cached-data API now serves both scans and computes material what-ifs. The
+next milestone is a React dashboard that can compare two office rooms and play a material what-if using cached data.
 The [Hear the Space build guide](https://claude.ai/artifact/Vie6TwPdwnQxj7zGCiYq1C) describes the full demo,
 including the hourly street-noise slider and the agent.
 
@@ -101,7 +161,7 @@ including the hourly street-noise slider and the agent.
 | Dashboard | `frontend/src/pages/` and `components/` render the floor plan, room cards and controls | Building selection, A/B listening, what-ifs and an agent activity panel |
 | Agent | `backend/app/agent/` wraps the pipeline in deepagents tools | Ranked room recommendations, a live task trace and material review requests |
 
-### 1. Serve the cached buildings through FastAPI
+### 1. Serve the cached buildings through FastAPI (complete)
 
 1. Implement the building list and detail handlers in `backend/app/api/buildings.py`. Reuse the CoStar
    catalog loader and include analysis availability so the picker can distinguish cached scans from the rest.

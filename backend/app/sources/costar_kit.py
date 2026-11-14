@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Catalog of every building in the hackathon kit, for the explorer's building picker.
+Read property and listing data from the unpacked local CoStar hackathon kit.
 
     python3 -m app.sources.costar_kit          # (re)build data/catalog.json and data/kit_offsets.json
 
-One row per Matterport model in residential-listings.csv / commercial-properties.csv, with a short
-summary from the kit's JSONL records (price, beds, stories, ...) where a record exists. Byte offsets
-into the JSONL files are saved too, so the server can return a model's full CoStar records instantly.
-The explorer prototype builds this automatically on first start (about 10 s).
+The two CSVs link Matterport scan IDs to CoStar listing or property IDs. The JSONL
+files hold one detailed record per line. The catalog summarizes those records for
+the building picker. The per-scan fetch adds the matched records and nearby
+commercial properties to data/<sid>/bundle.json.
 """
 import csv
 import json
@@ -28,12 +28,15 @@ JSONL = {
 def scan(name, wanted):
     """{id: (offset, record)} for the records whose top-level id is in `wanted`."""
     out = {}
+    # Record byte positions so kit_records() can seek directly to a record later.
     with open(KIT / "data" / name, "rb") as fh:
         while True:
             off = fh.tell()
             line = fh.readline()
             if not line:
                 break
+            # The kit puts the record ID near the start of each line. Only parse
+            # the full JSON for IDs linked to scans in the CSVs.
             head = line[:40].decode("utf-8", "ignore")
             i = head.split('"id":', 1)[1].split(",", 1)[0].strip() if '"id":' in head else None
             if i in wanted:
@@ -42,6 +45,7 @@ def scan(name, wanted):
 
 
 def build():
+    """Join scan IDs to CoStar records and write the picker catalog and record offsets."""
     t = time.time()
     property_types = json.loads((KIT / "schemas" / "enums.json").read_text()).get("PropertyType", {})
     with open(KIT / "residential-listings.csv", newline="") as fh:
@@ -53,6 +57,8 @@ def build():
     features = scan(JSONL["features"], {r["ListingId"] for r in res})
     props = scan(JSONL["property"], {r["PropertyId"] for r in com})
 
+    # Group summaries and offsets by Matterport scan ID before writing the caches.
+    # Keep the original CoStar IDs for lookup in the source files.
     rows, offsets = {}, {}
     for r in res:
         sid, lid = r["MatterportModelId"], r["ListingId"]
@@ -94,10 +100,15 @@ def build():
     return out, offsets
 
 
+def load_catalog():
+    """Read the picker catalog from the cache."""
+    return json.loads(CATALOG.read_text())
+
+
 def load():
     if not CATALOG.exists() or not OFFSETS.exists():
         return build()
-    return json.loads(CATALOG.read_text()), json.loads(OFFSETS.read_text())
+    return load_catalog(), json.loads(OFFSETS.read_text())
 
 
 def kit_records(sid, offsets):
@@ -126,6 +137,7 @@ def find_jsonl(path, ids):
 
 
 def fetch_costar(sid, box, bundle):
+    """Attach CoStar records for one scan and the commercial properties in its aerial clip."""
     print("CoStar kit: records")
     cs = {"listing": None, "features": None, "property": None, "nearby": []}
     with open(KIT / "residential-listings.csv", newline="") as fh:
@@ -141,7 +153,8 @@ def fetch_costar(sid, box, bundle):
         pid = com["PropertyId"]
         cs["property"] = find_jsonl(KIT / "data" / "commercial-property.jsonl", [pid]).get(pid)
         cs["match"] = {"kind": "commercial", "id": pid, "address": com["Address"]}
-    # Every CoStar commercial property inside the clip: stories/height make them reference buildings.
+    # Project nearby properties onto the same pixel grid as the Vexcel image.
+    # The shadow prototype can use their reported heights and story counts as references.
     with open(KIT / "data" / "commercial-property.jsonl") as fh:
         for line in fh:
             p = json.loads(line)

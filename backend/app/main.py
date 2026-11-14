@@ -23,6 +23,7 @@ app.add_middleware(
 )
 
 app.include_router(buildings.router, prefix="/api/buildings", tags=["buildings"])
+app.include_router(acoustics.cached_router, prefix="/api/buildings")
 app.include_router(rooms.router, prefix="/api/rooms", tags=["rooms"])
 app.include_router(acoustics.router, prefix="/api/acoustics", tags=["acoustics"])
 app.include_router(jobs.router, prefix="/api/jobs", tags=["jobs"])

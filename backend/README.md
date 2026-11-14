@@ -18,6 +18,7 @@ uvicorn app.main:app --reload --port 8000        # http://localhost:8000/docs li
 | `prototypes/` | Local servers for the working explorer and acoustics demos |
 | `tests/` | Tests for the pipeline |
 
-The feature routes currently return 501. The existing pipeline scripts run as modules from `backend/`.
+The cached building, room and what-if endpoints are available in `/docs`. New-scan analysis and agent
+endpoints are still scaffolds. The pipeline scripts run as modules from `backend/`.
 To run the working demos, use `python3 -m prototypes.explorer` and `python3 -m prototypes.acoustics` in
 separate terminals with the backend environment active.

@@ -1,4 +1,9 @@
-"""Matterport GraphQL, scan assets, and the hackathon model catalog."""
+"""Fetch building interiors and scan metadata from the Matterport Model API.
+
+The CoStar kit supplies the scan ID. This module fetches room geometry,
+floor-plan images and a representative panorama. The building fetch writes
+the metadata to data/<sid>/bundle.json alongside the downloaded images.
+"""
 import io
 import os
 
@@ -19,6 +24,7 @@ def mp(query, **variables):
     """Run a Matterport Model API query; return `data`."""
     global _session
     if _session is None:
+        # Reuse the authenticated session across the metadata, room and panorama queries.
         _session = requests.Session()
         _session.auth = (secret("MATTERPORT_API_KEY"), secret("MATTERPORT_API_TOKEN"))
     r = _session.post(MP_API, json={"query": query, "variables": variables}, timeout=120)
@@ -124,6 +130,7 @@ def room_polygons(floors, rooms):
 
 
 def fetch_matterport(sid, outdir, bundle):
+    """Cache scan geometry and images, then return latitude and longitude for the aerial fetch."""
     print("Matterport: basics")
     m = mp(Q_BASICS, id=sid)["model"]
     try:
@@ -136,6 +143,8 @@ def fetch_matterport(sid, outdir, bundle):
 
     print("Matterport: rooms, walls, floor plans")
     r = mp(Q_ROOMS, id=sid)["model"]
+    # Matterport identifies room boundaries by edge ID. Expand those references
+    # into ordered polygons in the scan's local metre coordinates.
     polys = room_polygons(r["floors"], r["rooms"])
     rooms = []
     for room in r["rooms"]:
@@ -149,6 +158,8 @@ def fetch_matterport(sid, outdir, bundle):
             a, b = (vpos.get(v["id"]) for v in e["vertices"])
             if a and b:
                 walls.append({"floor": fl["id"], "type": e["type"], "thickness": e["thickness"], "a": a, "b": b})
+    # Keep the floor-plan origin and resolution so the room pipeline can
+    # convert scan coordinates to pixels on the downloaded images.
     plans = []
     for i, fp in enumerate((r.get("assets") or {}).get("floorplans") or []):
         if fp["format"] != "jpg" or "photogramy" not in (fp.get("flags") or []):
@@ -162,6 +173,8 @@ def fetch_matterport(sid, outdir, bundle):
 
     print("Matterport: panorama (furnished + defurnished)")
     panos = mp(Q_PANOS, id=sid)["model"]["panoLocations"]
+    # Prefer the sweep closest to the center of the largest labeled living room,
+    # dining room or kitchen. Use the first sweep when those labels are unavailable.
     living = [x for x in rooms if x["polygon"] and (x["label"] or "") in ("Living Room", "Dining Room", "Kitchen")]
     target = max(living, key=lambda x: (x["dimensions"] or {}).get("areaFloor") or 0) if living else None
     if target:
@@ -173,6 +186,7 @@ def fetch_matterport(sid, outdir, bundle):
     equirect(faces).save(outdir / "pano_equirect.jpg", quality=85)
     info = {"id": pano["id"], "label": pano["label"], "position": pano["position"],
             "room": target["label"] if target else None, "file": "pano_equirect.jpg"}
+    # A matching sweep ID lets the explorer compare the same viewpoint in both views.
     view = (m.get("view") or {}).get("id")
     if view:
         try:
@@ -187,12 +201,15 @@ def fetch_matterport(sid, outdir, bundle):
     bundle["matterport"]["pano"] = info
 
     print("Matterport: MatterPak")
+    # This query records availability and filenames. The separate pointcloud
+    # command fetches the archive URL and extracts cloud.xyz when needed.
     bundle["matterport"]["matterpak"] = mp(Q_MATTERPAK, id=sid)["model"]["bundle"]
     g = m["geolocation"]
     return float(g["lat"]), float(g["long"])
 
 
 def fetch_site(sid, bundle):
+    """Fetch drone and splat catalog metadata from the separate hackathon site."""
     print("Hackathon site: splat + drone catalog")
     auth = (secret("HACKATHON_SITE_USER", False), secret("HACKATHON_SITE_PASSWORD", False))
     r = requests.get(f"{SITE}/api/models/{sid}", timeout=60, auth=auth if all(auth) else None)

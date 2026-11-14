@@ -74,7 +74,23 @@ def rt60(room, mat, contents=None, which=None):
 
 
 def verdict(t):
-    return next(v for lim, v in VERDICTS if t <= lim)
+    return next((v for lim, v in VERDICTS if t <= lim), VERDICTS[-1][1])
+
+
+def room_acoustics(room, materials):
+    """Calculate the metrics stored in the cache and displayed for what-ifs."""
+    times, absorption = rt60(room, materials)
+    low, _ = rt60(room, materials, which="high")
+    high, _ = rt60(room, materials, which="low")
+    furnished, _ = rt60(room, materials, contents="furnished")
+    return {
+        "rt60": [round(value, 2) for value in times],
+        "rt60_range_500": [round(low[1], 2), round(high[1], 2)],
+        "rt60_furnished": [round(value, 2) for value in furnished],
+        "absorption_500": round(absorption[1], 1),
+        "surface_m2": round(sum(area for _, area in surfaces(room, materials)), 1),
+        "verdict": verdict(times[1]),
+    }
 
 
 def dry_voice():
@@ -102,16 +118,13 @@ def main():
     out = []
     for r in rooms["rooms"]:
         m = mats["rooms"][r["id"]]
-        t, absorb = rt60(r, m)
-        lo, _ = rt60(r, m, which="high")       # more absorption -> shorter echo
-        hi, _ = rt60(r, m, which="low")
-        tf, _ = rt60(r, m, contents="furnished")
-        mid = t[1]
-        out.append({**r, **m, "rt60": [round(v, 2) for v in t], "rt60_range_500": [round(lo[1], 2), round(hi[1], 2)],
-                    "rt60_furnished": [round(v, 2) for v in tf], "absorption_500": round(absorb[1], 1),
-                    "surface_m2": round(sum(x for _, x in surfaces(r, m)), 1), "verdict": verdict(mid)})
+        metrics = room_acoustics(r, m)
+        out.append({**r, **m, **metrics})
+        t = metrics["rt60"]
+        lo, hi = metrics["rt60_range_500"]
+        tf = metrics["rt60_furnished"]
         print(f"  {r['id']:4} {m['type']:24} {r['area_m2']:6.1f} m²  RT60 {t[0]:.2f}/{t[1]:.2f}/{t[2]:.2f} s "
-              f"(mid range {lo[1]:.2f}-{hi[1]:.2f})  furnished {tf[1]:.2f} s  → {verdict(mid)}")
+              f"(mid range {lo:.2f}-{hi:.2f})  furnished {tf[1]:.2f} s  → {metrics['verdict']}")
     voice = dry_voice()
     res = {"model": a.model, "bands_hz": BANDS, "materials": MATERIALS, "contents": CONTENTS,
            "air_m_2k": AIR_M_2K, "verdicts": VERDICTS, "rooms": out, "floorplan": rooms["floorplan"],
