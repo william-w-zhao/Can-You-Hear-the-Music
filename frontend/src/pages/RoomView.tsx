@@ -9,7 +9,8 @@ import WhatIf from "../components/WhatIf";
 import RoomComparison from "../components/RoomComparison";
 import RoomImages from "../components/RoomImages";
 import "../room.css";
-import { Dimensions, RoomInterior } from "../components/RoomEvidence";
+import { Dimensions } from "../components/RoomEvidence";
+import RoomInterior from "../components/RoomInterior";
 import RoomReview from "../components/RoomReview";
 
 export default function RoomView() {

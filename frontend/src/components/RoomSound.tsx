@@ -3,6 +3,7 @@ import { api, type AcousticDetails, type RoomAcoustics } from "../api";
 import { useRequest } from "../useRequest";
 import Listen from "./Listen";
 import WhatIf from "./WhatIf";
+import Spinner from "./Spinner";
 
 export default function RoomSound({ sid, roomId, details }: {
   sid: string;
@@ -66,7 +67,7 @@ export default function RoomSound({ sid, roomId, details }: {
         {compareId && !otherRoom && (
           comparison.state.status === "error"
             ? <p role="alert">Couldn’t load the comparison room. <button onClick={comparison.retry}>Retry</button></p>
-            : <p role="status">Loading comparison room…</p>
+            : <Spinner size="small" label="Loading comparison room" />
         )}
       </section>
       <Listen choices={choices} voiceUrl={details.voice_url} />

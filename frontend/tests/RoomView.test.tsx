@@ -67,6 +67,8 @@ it("retains William's panorama evidence and applies approved reviews to the comp
           },
         ],
         descriptions: { floor: "Floor material" },
+        applied: [],
+        details: null,
       });
     if (path.endsWith("/what-if")) return Response.json(second.room);
     if (path.endsWith("/rooms")) return Response.json(plan);
@@ -91,7 +93,7 @@ it("retains William's panorama evidence and applies approved reviews to the comp
     await screen.findByRole("checkbox", { name: "Carpet on pad" }),
   );
   await userEvent.click(
-    screen.getByRole("button", { name: "Apply selected changes" }),
+    screen.getByRole("button", { name: "Apply selected suggestions" }),
   );
   await screen.findByText(
     "Review saved. The room reflects your approved changes.",

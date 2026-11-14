@@ -5,6 +5,7 @@ import {
   type RoomAcoustics,
   type RoomMaterials,
 } from "../api";
+import Spinner from "./Spinner";
 
 export default function WhatIf({
   sid,
@@ -140,7 +141,7 @@ export default function WhatIf({
           </div>
         </fieldset>
       </form>
-      {busy && <p role="status">Recomputing echo times...</p>}
+      {busy && <Spinner size="small" label="Recomputing echo times" />}
       {error && (
         <p className="error" role="alert">
           {error}

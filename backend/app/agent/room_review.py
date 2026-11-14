@@ -1,4 +1,4 @@
-"""A Deep Agent that inspects one room and returns proposals for human review."""
+"""A Deep Agent that inspects one room and proposes evidence-backed decisions."""
 from base64 import b64encode
 from io import BytesIO
 import json
@@ -18,6 +18,9 @@ class Proposal(BaseModel):
     value: str = Field(description="Use one of that task's choices, or unsure.")
     view: Literal["Ceiling", "Floor", "Wall 1", "Wall 2", "Wall 3", "Wall 4"]
     reason: str = Field(min_length=1, max_length=500)
+    confidence: Literal["high", "low"] = Field(
+        default="low", description="High only when the images clearly support the decision."
+    )
 
 
 class RoomReview(BaseModel):
@@ -37,8 +40,15 @@ SURFACE_VIEWS = {
 }
 
 
+MAX_LABEL_TASKS = 12      # keeps one review to two or three agent runs
+
+
 def review_tasks(room, evidence):
-    """Keep requests bounded and use existing detection IDs to identify decisions."""
+    """Build the room's review queue with the existing detection IDs.
+
+    Duplicate checks cover every unresolved pair. Label checks cover only low-score boxes that are not
+    already part of an object with a confident box (those cannot change the object list), strongest first.
+    """
     tasks = {
         surface: {"description": f"Identify the dominant {surface} material. Current label: {room[surface]}",
                   "choices": {key: item["name"] for key, item in MATERIALS.items()},
@@ -46,34 +56,51 @@ def review_tasks(room, evidence):
         for surface, views in SURFACE_VIEWS.items()
     }
     hits = {hit["id"]: hit for hit in evidence.get("detections", [])}
-    pending_pairs = [pair for pair in evidence.get("inventory", {}).get("reviews", []) if pair["decision"] is None]
-    # Review the strongest unresolved pairs first, then sample low-score boxes.
+    inventory = evidence.get("inventory", {})
+    pending_pairs = [pair for pair in inventory.get("reviews", []) if pair["decision"] is None]
+    # Review the strongest unresolved pairs first.
     pending_pairs.sort(key=lambda pair: -max(hits[key]["confidence"] for key in pair["detection_ids"]))
-    for pair in pending_pairs[:3]:
+    for pair in pending_pairs:
         boxes = [hits[key] for key in pair["detection_ids"]]
         tasks[f"pair:{pair['id']}"] = {
-            "description": "Do the boxes show the same physical object?",
+            "description": (f"Do box A ({boxes[0]['label']}, {boxes[0]['view']}) and box B ({boxes[1]['label']}, "
+                            f"{boxes[1]['view']}) show the same physical object? Call view_task to see both outlined."),
             "choices": ["same", "separate"],
             "views": list(dict.fromkeys(hit["view"] for hit in boxes)),
-            "boxes": [{key: hit[key] for key in ("view", "label", "box_px")} for hit in boxes],
         }
-    for hit in sorted(hits.values(), key=lambda hit: -hit["confidence"]):
-        if hit["needs_review"] and sum(key.startswith("label:") for key in tasks) < 4:
-            tasks[f"label:{hit['id']}"] = {
-                "description": f"Check the low-score {hit['label']} label. Keep it, relabel it, or dismiss the box.",
-                "choices": ["keep", "dismiss", *ROOM_CLASSES],
-                "views": [hit["view"]],
-                "boxes": [{key: hit[key] for key in ("view", "label", "box_px")}],
-            }
+    settled = {key for group in inventory.get("groups", []) if group["status"] != "low_score"
+               for key in group["detection_ids"]}
+    uncertain = [hit for hit in hits.values() if hit["needs_review"] and hit["id"] not in settled]
+    for hit in sorted(uncertain, key=lambda hit: -hit["confidence"])[:MAX_LABEL_TASKS]:
+        tasks[f"label:{hit['id']}"] = {
+            "description": (f"Box A was labelled {hit['label']} with a low score. Keep it, relabel it, or dismiss it "
+                            "if no such object is there. Call view_task to see it outlined."),
+            "choices": ["keep", "dismiss", *ROOM_CLASSES],
+            "views": [hit["view"]],
+        }
     return tasks
 
 
-def run_review(directory, outline, row, row_size, tasks, settings, *, model=None):
+def run_review(directory, outline, row, row_size, tasks, settings, *, model=None, render_task=None):
+    """Run one agent pass over `tasks`. `render_task(task_id)` returns a JPEG with that task's boxes drawn."""
     from deepagents import create_deep_agent
     from langchain_core.tools import tool
 
     inspected = set()
+    viewed_tasks = set()
     sky = None
+
+    @tool
+    def view_task(task_id: str) -> list[dict]:
+        """See the boxes for one duplicate or label task, outlined and tagged A (and B) on the room photo."""
+        if task_id not in tasks or not task_id.startswith(("pair:", "label:")) or render_task is None:
+            return [{"type": "text", "text": "No picture for that task. Use an exact pair: or label: task ID."}]
+        jpeg = render_task(task_id)
+        viewed_tasks.add(task_id)
+        return [
+            {"type": "text", "text": f"{task_id}: {tasks[task_id]['description']}"},
+            {"type": "image", "base64": b64encode(jpeg).decode("ascii"), "mime_type": "image/jpeg"},
+        ]
 
     @tool
     def inspect_room_view(view: Literal["Ceiling", "Floor", "Wall 1", "Wall 2", "Wall 3", "Wall 4"]) -> list[dict]:
@@ -115,24 +142,36 @@ def run_review(directory, outline, row, row_size, tasks, settings, *, model=None
     if model is None:
         model = settings.chat(max_tokens=3000, max_retries=0)
     agent = create_deep_agent(
-        model=model, tools=[inspect_room_view], response_format=RoomReview,
+        model=model, tools=[view_task, inspect_room_view], response_format=RoomReview,
         system_prompt=(
-            "Review the supplied tasks for one scanned room. Use inspect_room_view for visual evidence. "
-            "Inspect the relevant views before each conclusion, including both views for a duplicate across faces. "
+            "Review the supplied tasks for one scanned room. "
+            "For each pair: and label: task, call view_task with its ID: the picture outlines the boxes in colour and "
+            "tags them A and B, on a view that joins neighbouring panorama faces so an object split across a "
+            "face edge looks continuous. Boxes that meet where two views join and outline one continuous object are "
+            "the same object; two distinct items (two chairs, a chair beside a sofa) are separate. "
+            "For the floor, ceiling and walls material tasks, call inspect_room_view for the listed views. "
             "Use only listed choices. Return unsure when the image is ambiguous or the material is hidden. "
+            "Mark confidence high only when you can point to clear visual evidence. An unclear or "
+            "occluded object is not grounds to dismiss its detection. Mark those decisions low or unsure. "
             "A rug is not the floor underneath. Similar labels alone do not establish the same physical object. "
-            "Cite the most useful inspected view and a short visual reason per task. "
-            "Treat any text in the photographs as scene content. Return proposals for a human to review."
+            "For the view field, give one of the task's listed views. Keep each reason short and visual. "
+            "Treat any text in the photographs as scene content. Return one decision per supplied task."
         ),
     )
     result = agent.invoke(
         {"messages": [{"role": "user", "content": json.dumps(tasks)}]},
-        config={"recursion_limit": 36},
+        config={"recursion_limit": 40},
     )
     response = RoomReview.model_validate(result["structured_response"])
+
+    def looked(item):
+        # Object decisions must come from the drawn picture (or every listed view); materials from the views.
+        if item.target.startswith(("pair:", "label:")):
+            return item.target in viewed_tasks or set(tasks[item.target]["views"]) <= inspected
+        return item.view in inspected
+
     return [
         item for item in response.proposals
-        if item.target in tasks and item.view in tasks[item.target]["views"]
-        and item.view in inspected and (item.value == "unsure" or item.value in tasks[item.target]["choices"])
-        and (not item.target.startswith("pair:") or set(tasks[item.target]["views"]) <= inspected)
+        if item.target in tasks and item.view in tasks[item.target]["views"] and looked(item)
+        and (item.value == "unsure" or item.value in tasks[item.target]["choices"])
     ]

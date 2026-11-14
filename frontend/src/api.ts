@@ -172,6 +172,8 @@ export type RoomReview = {
   proposals: RoomProposal[];
   descriptions: Record<string, string>;
   model?: string;
+  applied: RoomProposal[];
+  details: AcousticDetails | null;
 };
 
 export type Detection = {
@@ -185,13 +187,16 @@ type EvidenceStatus = "pending" | "complete" | "unavailable" | "failed";
 
 export type ObjectPair = [string, string];
 export type MatchDecision = "same" | "separate" | "reset";
+export type ObjectGroup = {
+  id: string;
+  label: string;
+  detection_ids: string[];
+  views: string[];
+  confidence: number;
+  status: "estimated" | "needs_match" | "low_score";
+};
 export type ObjectInventory = {
-  groups: {
-    id: string;
-    label: string;
-    detection_ids: string[];
-    status: "estimated" | "needs_match" | "low_score";
-  }[];
+  groups: ObjectGroup[];
   reviews: {
     id: string;
     detection_ids: ObjectPair;
@@ -348,6 +353,19 @@ export const api = {
       detection_ids,
       decision,
     }),
+  mergeObjects: (sid: string, roomId: string, detection_ids: string[]) =>
+    post<ObjectInventory>(`${acousticPath(sid, roomId)}/object-review/merge`, {
+      detection_ids,
+    }),
+  splitObjects: (sid: string, roomId: string, detection_ids: string[]) =>
+    post<ObjectInventory>(`${acousticPath(sid, roomId)}/object-review/split`, {
+      detection_ids,
+    }),
+  // A room view with these detections outlined and tagged A, B, ... (an <img> source, not a fetch).
+  objectViewUrl: (sid: string, roomId: string, detection_ids: string[]) =>
+    `${acousticPath(sid, roomId)}/object-review/view.jpg?ids=${detection_ids
+      .map(encodeURIComponent)
+      .join(",")}`,
   suggestObjectMatch: (
     sid: string,
     roomId: string,

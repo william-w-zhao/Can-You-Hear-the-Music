@@ -128,10 +128,15 @@ With a model key set, the pipeline can suggest labels from the room panoramas.
 Use the review form to complete missing or uncertain labels.
 Completed files are reused on retry. The job status lives in the current backend process.
 
-On a room page, **Review this room** runs Deep Agents with the configured model.
-It inspects the panorama and proposes surface materials, duplicate decisions, and fixes for low-scoring
-YOLO labels. Select the proposals to apply. Approved changes are saved by scan in `room_reviews.json`
-and approved material changes update the displayed echo estimate.
+On a room page, objects seen in two neighbouring photos are merged automatically when their boxes meet at the
+shared edge, and a box nested inside another is folded into it. Click boxes in the photo (or tick objects in the
+list) and select **Merge into one object** to combine any detections; **Split** undoes a merge. Remaining possible
+duplicates appear as cards that draw both boxes, tagged A and B, on one continuous view of the room.
+
+**Review this room** runs Deep Agents with the configured model. The agent sees the same drawn views, applies
+clear duplicate decisions and fixes for low-scoring YOLO labels.
+Ambiguous detections and material suggestions remain available for review. Changes are saved by scan
+in `room_reviews.json`, and approved material changes update the displayed echo estimate.
 
 Set the provider key in the root `.env`. Set `REVIEW_MODEL` to switch the provider
 or use a different model. Use a model that supports images, tool calls, and structured outputs.

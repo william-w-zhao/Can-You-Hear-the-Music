@@ -5,6 +5,7 @@ import BuildingAnalysis from "../components/BuildingAnalysis";
 import EvidenceImage from "../components/EvidenceImage";
 import FloorPlan from "../components/FloorPlan";
 import { useRequest } from "../useRequest";
+import { LoadingBlock } from "../components/Spinner";
 
 function Surroundings({ evidence }: { evidence: SurroundingsEvidence }) {
   const boxes = evidence.detections ?? [];
@@ -46,7 +47,7 @@ function Building({ sid }: { sid: string }) {
   return (
     <main>
       <Link className="back-link" to="/">← All buildings</Link>
-      {state.status === "loading" && <p role="status">Loading building…</p>}
+      {state.status === "loading" && <LoadingBlock label="Loading building" />}
       {state.status === "error" && <p role="alert">Couldn’t load the building. <button onClick={retry}>Try again</button></p>}
       {state.status === "ready" && (() => {
         const { building, geometry, surroundings } = state.data;

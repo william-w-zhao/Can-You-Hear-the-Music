@@ -1,3 +1,5 @@
+import Spinner from "./Spinner";
+
 export default function LoadState({
   error,
   retry,
@@ -12,8 +14,8 @@ export default function LoadState({
       <button onClick={retry}>Try again</button>
     </div>
   ) : (
-    <div className="state" role="status">
-      <span className="pulse" /> Loading your space...
+    <div className="state">
+      <Spinner size="large" label="Loading your space..." />
     </div>
   );
 }
