@@ -36,7 +36,8 @@ export default function Listen({
       stopRef.current?.();
       const previous = context.current;
       context.current = undefined;
-      if (previous && previous.state !== "closed") void previous.close().catch(() => {});
+      if (previous && previous.state !== "closed")
+        void previous.close().catch(() => {});
     };
   }, [choices, voiceUrl]);
   async function play(
@@ -130,14 +131,17 @@ export default function Listen({
     }
   }
   return (
-    <section className="details-panel sound-panel" aria-labelledby="listen-heading">
+    <section
+      className="panel listen details-panel sound-panel"
+      aria-labelledby="listen-heading"
+    >
       <h2 id="listen-heading">Listen to the room</h2>
       <div className="listen-options">
         {choices.map(({ label, room }) => (
           <div key={label}>
             <strong>{label}</strong>
             <span>{room.rt60[1].toFixed(2)} s at 500 Hz</span>
-            <div className="sound-actions">
+            <div className="actions sound-actions">
               <button
                 disabled={loading || !voiceUrl}
                 onClick={() => void play(room, label, "voice")}
@@ -154,10 +158,10 @@ export default function Listen({
           </div>
         ))}
       </div>
-      <button onClick={stop}>
-        Stop audio
-      </button>
-      {loading ? <Spinner size="small" label="Preparing audio" /> : (
+      <button onClick={stop}>Stop audio</button>
+      {loading ? (
+        <Spinner size="small" label="Preparing audio" />
+      ) : (
         <p role="status" aria-live="polite">
           {status}
         </p>

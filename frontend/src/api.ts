@@ -1,22 +1,93 @@
 // The only place that calls the backend. Every page and component goes through these functions.
 // Routes are defined in backend/app/api/.
 
-async function get<T>(path: string): Promise<T> {
-  const r = await fetch(path);
-  if (!r.ok) {
-    const error = await r.json().catch(() => null);
-    throw new Error(typeof error?.detail === "string" ? error.detail : `Request failed (${r.status}).`);
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
   }
-  return r.json();
 }
 
-async function post<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
-  const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body ?? {}), signal });
-  if (!r.ok) {
-    const error = await r.json().catch(() => null);
-    throw new Error(typeof error?.detail === "string" ? error.detail : `Request failed (${r.status}).`);
+async function request(
+  path: string,
+  init: RequestInit = {},
+): Promise<Response> {
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  init.signal?.addEventListener("abort", abort, { once: true });
+  if (init.signal?.aborted) controller.abort();
+  const timer = setTimeout(abort, 30_000);
+  try {
+    const r = await fetch(path, { ...init, signal: controller.signal });
+    if (!r.ok) {
+      let detail = "";
+      try {
+        const data = await r.json();
+        detail =
+          typeof data.detail === "string"
+            ? data.detail
+            : Array.isArray(data.detail)
+              ? data.detail
+                  .map(
+                    (item: { loc?: string[]; msg?: string }) =>
+                      `${item.loc?.join(".") ?? "Input"}: ${item.msg ?? "Invalid value"}`,
+                  )
+                  .join("; ")
+              : "";
+      } catch {
+        /* The development proxy can return a non-JSON error. */
+      }
+      throw new ApiError(
+        detail ||
+          (r.status === 501
+            ? "This feature is not available yet."
+            : `Unable to load data (HTTP ${r.status}). Check that the backend is running.`),
+        r.status,
+      );
+    }
+    return r;
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    if (init.signal?.aborted)
+      throw new DOMException("Request cancelled", "AbortError");
+    if (controller.signal.aborted)
+      throw new Error("The request timed out. Please try again.");
+    throw new Error(
+      "Cannot reach the backend. Check your connection and try again.",
+    );
+  } finally {
+    clearTimeout(timer);
+    init.signal?.removeEventListener("abort", abort);
   }
-  return r.json();
+}
+
+async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
+  const r = await request(path, { signal });
+  try {
+    return await r.json();
+  } catch {
+    throw new Error("The backend returned invalid JSON.");
+  }
+}
+
+async function post<T>(
+  path: string,
+  body?: unknown,
+  signal?: AbortSignal,
+): Promise<T> {
+  const r = await request(path, {
+    method: "POST",
+    signal,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body ?? {}),
+  });
+  try {
+    return await r.json();
+  } catch {
+    throw new Error("The backend returned invalid JSON.");
+  }
 }
 
 export type BuildingSummary = {
@@ -78,7 +149,11 @@ export type AcousticDetails = {
     area_m2: number | null;
     volume_m3: number | null;
     footprint_source: "matterport" | "point_cloud";
-    height_source: "matterport" | "assumed" | "point_cloud_estimate" | "floor_point_cloud_estimate";
+    height_source:
+      | "matterport"
+      | "assumed"
+      | "point_cloud_estimate"
+      | "floor_point_cloud_estimate";
   } | null;
   object_evidence: ObjectEvidence;
   can_run_room_review?: boolean;
@@ -86,7 +161,12 @@ export type AcousticDetails = {
   review_model_error?: string | null;
 };
 
-export type RoomProposal = { target: string; value: string; view: string; reason: string };
+export type RoomProposal = {
+  target: string;
+  value: string;
+  view: string;
+  reason: string;
+};
 export type RoomReview = {
   revision: string;
   proposals: RoomProposal[];
@@ -117,21 +197,34 @@ export type ObjectGroup = {
 };
 export type ObjectInventory = {
   groups: ObjectGroup[];
-  reviews: { id: string; detection_ids: ObjectPair; decision: "same" | "separate" | null; reason: string }[];
+  reviews: {
+    id: string;
+    detection_ids: ObjectPair;
+    decision: "same" | "separate" | null;
+    reason: string;
+  }[];
 };
 
 export type ObjectEvidence = {
   status: EvidenceStatus;
   objects?: string[];
   candidates?: string[];
-  detections?: (Detection & { id: string; view: string; sheet_box_px: Detection["box_px"] })[];
+  detections?: (Detection & {
+    id: string;
+    view: string;
+    sheet_box_px: Detection["box_px"];
+  })[];
   inventory?: ObjectInventory;
   can_suggest_match?: boolean;
   image_url?: string;
   image_width?: number;
   image_height?: number;
   image_row?: [number, number, number, number];
-  views?: { name: string; viewport: [number, number, number, number]; photo_url?: string }[];
+  views?: {
+    name: string;
+    viewport: [number, number, number, number];
+    photo_url?: string;
+  }[];
 };
 
 export type Surroundings = {
@@ -160,40 +253,157 @@ export type AnalysisJob = {
 const acousticPath = (sid: string, roomId: string) =>
   `/api/buildings/${encodeURIComponent(sid)}/rooms/${encodeURIComponent(roomId)}/acoustics`;
 
+function checkedRoom(room: RoomAcoustics): RoomAcoustics {
+  if (
+    !room ||
+    !Array.isArray(room.rt60) ||
+    room.rt60.length !== 3 ||
+    !room.rt60.every((n) => Number.isFinite(n) && n > 0) ||
+    !Array.isArray(room.rt60_range_500) ||
+    room.rt60_range_500.length !== 2 ||
+    !room.rt60_range_500.every((n) => Number.isFinite(n) && n >= 0) ||
+    !Number.isFinite(room.absorption_500) ||
+    room.absorption_500 <= 0 ||
+    typeof room.verdict !== "string" ||
+    !["id", "type", "floor", "ceiling", "walls", "furnishing"].every(
+      (key) => typeof room[key as keyof RoomAcoustics] === "string",
+    ) ||
+    !Number.isFinite(room.glass_m2) ||
+    room.glass_m2 < 0
+  ) {
+    throw new Error("The backend returned incomplete acoustic results.");
+  }
+  return room;
+}
+
 export const api = {
+  roomImageSheet: async (sid: string, signal?: AbortSignal) =>
+    (
+      await request(`/data/${encodeURIComponent(sid)}/room_sheet.jpg`, {
+        signal,
+      })
+    ).blob(),
   buildings: (query = "") => get<BuildingSummary[]>(`/api/buildings${query}`),
-  building: (sid: string) => get<BuildingSummary>(`/api/buildings/${encodeURIComponent(sid)}`),
-  analyse: (sid: string) => post<{ job_id: string }>(`/api/buildings/${encodeURIComponent(sid)}/analyse`),
-  analysisJob: (jobId: string) => get<AnalysisJob>(`/api/jobs/${encodeURIComponent(jobId)}`),
+  building: (sid: string) =>
+    get<BuildingSummary>(`/api/buildings/${encodeURIComponent(sid)}`),
+  analyse: (sid: string) =>
+    post<{ job_id: string }>(
+      `/api/buildings/${encodeURIComponent(sid)}/analyse`,
+    ),
+  analysisJob: (jobId: string) =>
+    get<AnalysisJob>(`/api/jobs/${encodeURIComponent(jobId)}`),
   saveMaterials: (jobId: string, materials: Record<string, RoomMaterials>) =>
-    post<{ job_id: string }>(`/api/jobs/${encodeURIComponent(jobId)}/materials`, materials),
-  rooms: (sid: string) => get<BuildingRooms>(`/api/buildings/${encodeURIComponent(sid)}/rooms`),
-  surroundings: (sid: string) => get<Surroundings>(`/api/buildings/${encodeURIComponent(sid)}/surroundings`),
-  acoustics: (sid: string, roomId: string) => get<AcousticDetails>(acousticPath(sid, roomId)),
-  reviewRoom: (sid: string, roomId: string) => post<RoomReview>(`${acousticPath(sid, roomId)}/room-review`),
-  approveRoomReview: (sid: string, roomId: string, revision: string, proposals: RoomProposal[]) =>
-    post<AcousticDetails>(`${acousticPath(sid, roomId)}/room-review/approve`, { revision, proposals }),
-  saveObjectMatch: (sid: string, roomId: string, detection_ids: ObjectPair, decision: MatchDecision) =>
-    post<ObjectInventory>(`${acousticPath(sid, roomId)}/object-review`, { detection_ids, decision }),
+    post<{ job_id: string }>(
+      `/api/jobs/${encodeURIComponent(jobId)}/materials`,
+      materials,
+    ),
+  rooms: async (sid: string, signal?: AbortSignal) => {
+    const data = await get<BuildingRooms>(
+      `/api/buildings/${encodeURIComponent(sid)}/rooms`,
+      signal,
+    );
+    if (
+      !data ||
+      !Array.isArray(data.rooms) ||
+      data.rooms.some(
+        (room) =>
+          typeof room.id !== "string" ||
+          typeof room.label !== "string" ||
+          ![room.area_m2, room.height_m, room.volume_m3].every(
+            (n) => Number.isFinite(n) && n > 0,
+          ),
+      )
+    )
+      throw new Error("The backend returned an invalid room list.");
+    return data;
+  },
+  acoustics: async (sid: string, roomId: string, signal?: AbortSignal) => {
+    const data = await get<AcousticDetails>(acousticPath(sid, roomId), signal);
+    checkedRoom(data?.room);
+    if (
+      !Array.isArray(data.bands_hz) ||
+      data.bands_hz.length !== 3 ||
+      !data.material_options ||
+      !Array.isArray(data.furnishing_options)
+    )
+      throw new Error("The backend returned incomplete material choices.");
+    return data;
+  },
+  surroundings: (sid: string) =>
+    get<Surroundings>(`/api/buildings/${encodeURIComponent(sid)}/surroundings`),
+  reviewRoom: (sid: string, roomId: string) =>
+    post<RoomReview>(`${acousticPath(sid, roomId)}/room-review`),
+  approveRoomReview: (
+    sid: string,
+    roomId: string,
+    revision: string,
+    proposals: RoomProposal[],
+  ) =>
+    post<AcousticDetails>(`${acousticPath(sid, roomId)}/room-review/approve`, {
+      revision,
+      proposals,
+    }),
+  saveObjectMatch: (
+    sid: string,
+    roomId: string,
+    detection_ids: ObjectPair,
+    decision: MatchDecision,
+  ) =>
+    post<ObjectInventory>(`${acousticPath(sid, roomId)}/object-review`, {
+      detection_ids,
+      decision,
+    }),
   mergeObjects: (sid: string, roomId: string, detection_ids: string[]) =>
-    post<ObjectInventory>(`${acousticPath(sid, roomId)}/object-review/merge`, { detection_ids }),
+    post<ObjectInventory>(`${acousticPath(sid, roomId)}/object-review/merge`, {
+      detection_ids,
+    }),
   splitObjects: (sid: string, roomId: string, detection_ids: string[]) =>
-    post<ObjectInventory>(`${acousticPath(sid, roomId)}/object-review/split`, { detection_ids }),
+    post<ObjectInventory>(`${acousticPath(sid, roomId)}/object-review/split`, {
+      detection_ids,
+    }),
   // A room view with these detections outlined and tagged A, B, ... (an <img> source, not a fetch).
   objectViewUrl: (sid: string, roomId: string, detection_ids: string[]) =>
-    `${acousticPath(sid, roomId)}/object-review/view.jpg?ids=${detection_ids.map(encodeURIComponent).join(",")}`,
-  suggestObjectMatch: (sid: string, roomId: string, detection_ids: ObjectPair) =>
-    post<{ decision: "same" | "separate" | "unsure"; reason: string; model?: string }>(
-      `${acousticPath(sid, roomId)}/object-review/suggest`, { detection_ids }),
-  whatIf: (sid: string, roomId: string, materials: Partial<RoomMaterials>, signal?: AbortSignal) =>
-    post<RoomAcoustics>(`${acousticPath(sid, roomId)}/what-if`, materials, signal),
-  voice: async (url: string, signal?: AbortSignal) => {
-    if (!url.startsWith("/audio/")) throw new Error("Invalid voice clip location.");
-    const response = await fetch(url, { signal });
-    if (!response.ok) throw new Error("Couldn’t load the voice clip. Try the clap.");
-    return response.arrayBuffer();
+    `${acousticPath(sid, roomId)}/object-review/view.jpg?ids=${detection_ids
+      .map(encodeURIComponent)
+      .join(",")}`,
+  suggestObjectMatch: (
+    sid: string,
+    roomId: string,
+    detection_ids: ObjectPair,
+  ) =>
+    post<{
+      decision: "same" | "separate" | "unsure";
+      reason: string;
+      model?: string;
+    }>(`${acousticPath(sid, roomId)}/object-review/suggest`, { detection_ids }),
+  whatIf: async (
+    sid: string,
+    roomId: string,
+    materials: Partial<RoomMaterials>,
+    signal?: AbortSignal,
+  ) => {
+    if (
+      materials.glass_m2 !== undefined &&
+      (!Number.isFinite(materials.glass_m2) || materials.glass_m2 < 0)
+    )
+      throw new Error("Glass area must be a non-negative number.");
+    return checkedRoom(
+      await post<RoomAcoustics>(
+        `${acousticPath(sid, roomId)}/what-if`,
+        materials,
+        signal,
+      ),
+    );
   },
-  newThread: (sid: string) => post<{ thread_id: string }>("/api/agent/threads", { sid }),
-  send: (threadId: string, text: string) => post(`/api/agent/threads/${threadId}/messages`, { text }),
-  agentEvents: (threadId: string) => new EventSource(`/api/agent/threads/${threadId}/events`),
+  voice: async (url: string, signal?: AbortSignal) => {
+    if (!url.startsWith("/audio/") || url.startsWith("//"))
+      throw new Error("Invalid voice clip location.");
+    return (await request(url, { signal })).arrayBuffer();
+  },
+  newThread: (sid: string) =>
+    post<{ thread_id: string }>("/api/agent/threads", { sid }),
+  send: (threadId: string, text: string) =>
+    post(`/api/agent/threads/${threadId}/messages`, { text }),
+  agentEvents: (threadId: string) =>
+    new EventSource(`/api/agent/threads/${threadId}/events`),
 };
