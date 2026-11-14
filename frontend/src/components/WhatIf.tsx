@@ -35,8 +35,10 @@ export default function WhatIf({
   const validGlass =
     glass.trim() !== "" && Number.isFinite(Number(glass)) && Number(glass) >= 0;
   return (
-    <section className="details-panel sound-panel" aria-labelledby="treatment-heading">
-      <h2 id="treatment-heading">Try a material treatment</h2>
+    <section className="panel">
+      <div className="eyebrow">CHANGE THE SURFACE</div>
+      <h2>What if this room felt softer?</h2>
+      <p>Try a treatment. The original scan stays available for comparison.</p>
       <form
         onSubmit={async (e) => {
           e.preventDefault();
@@ -56,7 +58,7 @@ export default function WhatIf({
             if (!controller.signal.aborted) {
               onResult(room);
               setNotice(
-                "Treatment ready. Play it in the listening panel.",
+                "Comparison updated. Listen to the baseline and what-if below.",
               );
             }
           } catch (e) {
@@ -69,7 +71,7 @@ export default function WhatIf({
         }}
       >
         <fieldset disabled={busy}>
-          <div className="sound-form">
+          <div className="form-grid">
             {(["floor", "ceiling", "walls"] as const).map((field) => (
               <label key={field}>
                 {field}
@@ -118,18 +120,19 @@ export default function WhatIf({
             </label>
           </div>
           {!validGlass && <p role="alert">Enter a non-negative glass area.</p>}
-          <div className="sound-actions">
+          <div className="actions">
             <button disabled={!validGlass} type="submit">
               {busy ? "Calculating..." : "Apply what-if"}
             </button>
             <button
+              className="secondary"
               type="button"
               onClick={() => {
                 setValues(initial);
                 setGlass(String(initial.glass_m2));
                 onResult(undefined);
                 setError("");
-                setNotice("Reset to the current room materials.");
+                setNotice("Reset to the original scan.");
               }}
             >
               Reset to baseline
