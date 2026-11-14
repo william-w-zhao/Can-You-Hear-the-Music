@@ -4,14 +4,16 @@
     {
       "name": "explorer",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["explorer/serve.py"],
+      "runtimeArgs": ["-m", "prototypes.explorer"],
+      "cwd": "backend",
       "env": { "PORT": "8765" },
       "port": 8765
     },
     {
       "name": "acoustics",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["acoustics/serve.py"],
+      "runtimeArgs": ["-m", "prototypes.acoustics"],
+      "cwd": "backend",
       "env": { "PORT": "8766" },
       "port": 8766
     }

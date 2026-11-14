@@ -1,0 +1,893 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Building Explorer</title>
+<script src="/config.js"></script>
+<style>
+:root{
+  --bg:#f4f6f9; --surface:#ffffff; --surface-2:#eef1f6; --ink:#121a2b; --muted:#5a6577; --faint:#8a94a6; --line:#d7dde6;
+  --accent:#9a5f00; --accent-soft:#fcefcb; --link:#2a63c9;
+  --ref:#eb6834; --target:#6250d6; --costar:#1baf7a;
+  --good:#0ca30c; --warning:#fab219; --serious:#ec835a; --critical:#d03b3b;
+  --mid:#f0efec;
+  --s100:#cde2fb; --s250:#86b6ef; --s400:#3987e5; --s550:#1c5cab; --s700:#0d366b;
+  --d-red:#e34948;
+  --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e1420; --surface:#151d2c; --surface-2:#1b2435; --ink:#e6ebf3; --muted:#9da8ba; --faint:#6f7a8d; --line:#273246;
+    --accent:#f5c55a; --accent-soft:#3a2e12; --link:#7fa6f0; --ref:#d95926; --target:#9085e9; --costar:#199e70;
+    --mid:#383835; --d-red:#e66767; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e1420; --surface:#151d2c; --surface-2:#1b2435; --ink:#e6ebf3; --muted:#9da8ba; --faint:#6f7a8d; --line:#273246;
+  --accent:#f5c55a; --accent-soft:#3a2e12; --link:#7fa6f0; --ref:#d95926; --target:#9085e9; --costar:#199e70;
+  --mid:#383835; --d-red:#e66767; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 -apple-system,"Segoe UI",Roboto,sans-serif}
+a{color:var(--link)}
+h1{font-size:1.65rem;margin:0;line-height:1.2}
+h2{font-size:1.3rem;margin:0 0 4px}
+h3{font-size:1.02rem;margin:18px 0 8px}
+p{margin:6px 0;max-width:75ch}
+code,.mono{font-family:var(--mono);font-size:.86em}
+.muted{color:var(--muted)} .small{font-size:.86rem}
+header.top{position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--line)}
+.top-inner{max-width:1280px;margin:0 auto;padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.top-inner nav{display:flex;gap:4px;flex-wrap:wrap;margin-left:auto}
+.top-inner nav a{text-decoration:none;color:var(--muted);padding:4px 9px;border-radius:6px;font-size:.88rem}
+.top-inner nav a:hover{background:var(--surface-2);color:var(--ink)}
+select,button{font:inherit;font-size:.9rem;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:5px 9px}
+button{cursor:pointer} button[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+main{max-width:1280px;margin:0 auto;padding:18px 16px 60px}
+.hero{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:18px;align-items:start;margin-bottom:8px}
+.hero img{width:100%;border-radius:10px;border:1px solid var(--line);display:block}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.chip{font-size:.78rem;border:1px solid var(--line);border-radius:999px;padding:2px 9px;background:var(--surface);display:inline-flex;gap:5px;align-items:center}
+.chip .dot{width:7px;height:7px;border-radius:50%}
+section{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;margin-top:18px}
+section > .sub{color:var(--muted);margin:0 0 12px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:12px 0}
+.tile{border:1px solid var(--line);border-radius:9px;padding:10px 12px;background:var(--bg)}
+.tile .k{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.tile .v{font-size:1.45rem;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.25}
+.tile .s{font-size:.8rem;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+.mapwrap{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:start}
+.map{position:relative;overflow:hidden;border-radius:10px;border:1px solid var(--line);background:#000;aspect-ratio:1/1;cursor:grab;touch-action:none}
+.map.dragging{cursor:grabbing}
+.map .stage{position:absolute;inset:0;transform-origin:0 0}
+.map img,.map svg{position:absolute;inset:0;width:100%;height:100%;display:block;user-select:none;-webkit-user-drag:none}
+.map svg polygon{vector-effect:non-scaling-stroke;cursor:pointer}
+.map .ctrls{position:absolute;right:8px;top:8px;display:flex;flex-direction:column;gap:4px;z-index:3}
+.map .ctrls button{width:32px;height:32px;padding:0;background:rgba(255,255,255,.92);color:#121a2b;border-color:#ccd}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.toolbar label{display:inline-flex;gap:5px;align-items:center;font-size:.88rem;color:var(--muted)}
+.legend{display:flex;gap:12px;flex-wrap:wrap;align-items:center;font-size:.8rem;color:var(--muted);margin-top:8px}
+.legend .sw{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:4px}
+.legend .ramp{width:160px;height:10px;border-radius:3px;display:inline-block;vertical-align:-1px;margin:0 4px}
+.panel{border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--bg);font-size:.9rem}
+.panel h4{margin:0 0 6px;font-size:.95rem}
+table{border-collapse:collapse;width:100%;font-size:.86rem}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600;background:var(--surface-2);position:sticky;top:0}
+th.sortable{cursor:pointer} td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.tablebox{max-height:420px;overflow:auto;border:1px solid var(--line);border-radius:9px}
+tr.sel td{background:var(--accent-soft)}
+tbody tr:hover td{background:var(--surface-2)}
+.kv{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 14px;font-size:.9rem}
+.kv dt{color:var(--muted)} .kv dd{margin:0;overflow-wrap:anywhere}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:10px 14px;border-radius:0 8px 8px 0;margin:12px 0;font-size:.92rem}
+.callout p{margin:3px 0}
+details{border:1px solid var(--line);border-radius:9px;padding:8px 12px;margin-top:10px;background:var(--bg)}
+details summary{cursor:pointer;font-weight:600;font-size:.9rem}
+pre.json{max-height:420px;overflow:auto;font:12px/1.5 var(--mono);margin:8px 0 0;white-space:pre-wrap;word-break:break-word}
+.chart{width:100%;height:auto;display:block}
+.chart text{fill:var(--muted);font-size:11px}
+.chart .grid line{stroke:var(--line);stroke-width:1}
+.tip{position:fixed;pointer-events:none;z-index:50;background:var(--ink);color:var(--surface);padding:7px 9px;border-radius:7px;font-size:.8rem;line-height:1.4;max-width:280px;display:none;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+.pano{height:380px;border-radius:10px;border:1px solid var(--line);background-repeat:repeat-x;background-size:auto 100%;cursor:grab;touch-action:none}
+.plan{position:relative;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}
+.plan img,.plan svg{display:block;width:100%;height:auto}
+.plan svg{position:absolute;inset:0;height:100%}
+.plan polygon{fill:transparent;stroke:none;cursor:pointer}
+.plan polygon:hover,.plan polygon.on{fill:rgba(57,135,229,.22)}
+.photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px}
+.photos img{width:100%;aspect-ratio:3/2;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+.tags{display:flex;gap:6px;flex-wrap:wrap}
+.tag{font-size:.8rem;background:var(--surface-2);border-radius:6px;padding:2px 8px}
+iframe.tour{width:100%;aspect-ratio:16/9;border:1px solid var(--line);border-radius:10px;background:#000}
+.err{color:var(--critical);font-size:.88rem}
+/* Building picker + room picker */
+.shell{display:grid;grid-template-columns:330px minmax(0,1fr);max-width:1600px;margin:0 auto}
+.shell main{max-width:none;margin:0;min-width:0}
+aside.picker{position:sticky;top:var(--hdr,53px);height:calc(100vh - var(--hdr,53px));display:flex;flex-direction:column;border-right:1px solid var(--line);background:var(--surface)}
+.picker .ctl{padding:12px 12px 8px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid var(--line)}
+.picker input[type=search]{font:inherit;font-size:.92rem;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 10px;width:100%}
+.picker .row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.picker .row select{flex:1;min-width:0}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;border-radius:0;padding:4px 9px;font-size:.82rem;background:var(--surface)}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+.picker .count{font-size:.78rem;color:var(--muted);padding:6px 12px;border-bottom:1px solid var(--line)}
+.picker ul{list-style:none;margin:0;padding:0;overflow:auto;flex:1}
+.picker li button{all:unset;box-sizing:border-box;display:block;width:100%;padding:8px 12px;border-bottom:1px solid var(--line);cursor:pointer}
+.picker li button:hover{background:var(--surface-2)}
+.picker li button[aria-current="true"]{background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent)}
+.picker li button:focus-visible{outline:2px solid var(--link);outline-offset:-2px}
+.picker .t{font-weight:600;font-size:.9rem;display:flex;gap:6px;align-items:baseline;justify-content:space-between}
+.picker .t span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.picker .d{font-size:.78rem;color:var(--muted)}
+.badge{font-size:.68rem;font-weight:600;border-radius:5px;padding:1px 6px;white-space:nowrap;flex:none}
+.badge.res{background:color-mix(in srgb,var(--target) 16%,transparent);color:var(--target)}
+.badge.com{background:color-mix(in srgb,var(--costar) 18%,transparent);color:var(--costar)}
+.badge.scan{background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent)}
+.picker .more{padding:10px 12px;font-size:.8rem;color:var(--muted)}
+.rooms-chips{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 12px}
+.rooms-chips button{font-size:.82rem;padding:3px 10px;border-radius:999px}
+.plan polygon.sel{fill:rgba(250,178,25,.35);stroke:#9a5f00;stroke-width:6}
+.roomcard{border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:10px;padding:12px 14px;background:var(--bg);margin-bottom:12px}
+.roomcard h4{margin:0 0 4px;font-size:1.1rem}
+.roomcard .tiles{margin:8px 0 4px}
+.roomcard .tiles{grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:8px}
+.roomcard .tile{background:var(--surface);padding:8px 10px}
+.roomcard .tile .v{font-size:1.15rem}
+.joblog{max-height:240px;overflow:auto;font:12px/1.5 var(--mono);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;white-space:pre-wrap;margin-top:10px}
+button.primary{background:var(--ink);color:var(--surface);border-color:var(--ink);padding:7px 14px}
+button.primary:disabled{opacity:.55;cursor:default}
+.hero .noimg{aspect-ratio:4/3;border-radius:10px;border:1px dashed var(--line);display:grid;place-items:center;color:var(--faint);font-size:.9rem;text-align:center;padding:16px}
+@media (max-width:960px){.hero,.mapwrap,.grid2{grid-template-columns:1fr}.top-inner nav{margin-left:0}
+  .shell{grid-template-columns:1fr} aside.picker{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line)} .picker ul{max-height:300px}}
+</style>
+</head>
+<body>
+<header class="top"><div class="top-inner">
+  <strong>Building explorer</strong>
+  <span class="muted small" id="hdrInfo"></span>
+  <nav id="sectionNav">
+    <a href="#shadows">Shadow heights</a><a href="#matterport">Matterport</a><a href="#drone">Drone &amp; splat</a>
+    <a href="#vexcel">Vexcel</a><a href="#costar">CoStar</a><a href="#osm">Outlines</a><a href="/keys">Key check</a>
+  </nav>
+</div></header>
+<div class="shell">
+<aside class="picker" aria-label="Choose a building">
+  <div class="ctl">
+    <input type="search" id="q" placeholder="Search address, name, city or model id" aria-label="Search buildings" autocomplete="off">
+    <div class="row">
+      <div class="seg" role="group" aria-label="Kind" id="kindSeg">
+        <button data-k="" aria-pressed="true">All</button><button data-k="residential" aria-pressed="false">Residential</button><button data-k="commercial" aria-pressed="false">Commercial</button>
+      </div>
+    </div>
+    <div class="row">
+      <select id="citySel" aria-label="City"><option value="">All cities</option></select>
+      <select id="sortSel" aria-label="Sort"><option value="scan">Scanned first</option><option value="address">Address</option><option value="price">Price</option><option value="sqft">Size</option><option value="stories">Stories</option><option value="year">Year built</option></select>
+    </div>
+    <label class="small muted"><input type="checkbox" id="scanOnly"> Only buildings with scan data downloaded</label>
+  </div>
+  <div class="count" id="count" aria-live="polite">Loading catalog…</div>
+  <ul id="list"></ul>
+</aside>
+<main id="app"><p class="muted">Loading…</p></main>
+</div>
+<div class="tip" id="tip"></div>
+
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+const NS = 'http://www.w3.org/2000/svg';
+function h(tag, attrs = {}, ...kids) {
+  const svgTags = ['svg','g','line','polyline','polygon','circle','rect','path','text','defs','marker','linearGradient','stop'];
+  const e = svgTags.includes(tag) ? document.createElementNS(NS, tag) : document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v == null || v === false) continue;
+    if (k === 'class') e.setAttribute('class', v);
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+    else if (k === 'html') e.innerHTML = v;
+    else e.setAttribute(k, v === true ? '' : v);
+  }
+  for (const k of kids.flat()) if (k != null && k !== false) e.append(k.nodeType ? k : document.createTextNode(k));
+  return e;
+}
+const fmt = (v, d = 1) => v == null || Number.isNaN(v) ? '–' : Number(v).toLocaleString(undefined, { maximumFractionDigits: d, minimumFractionDigits: 0 });
+const money = v => v == null ? '–' : '$' + Number(v).toLocaleString();
+const date = s => s ? new Date(s).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '–';
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const tip = $('#tip');
+function showTip(ev, html) { tip.innerHTML = html; tip.style.display = 'block';
+  const x = Math.min(ev.clientX + 14, innerWidth - tip.offsetWidth - 8), y = Math.min(ev.clientY + 14, innerHeight - tip.offsetHeight - 8);
+  tip.style.left = x + 'px'; tip.style.top = y + 'px'; }
+const hideTip = () => tip.style.display = 'none';
+function kv(pairs) { return h('dl', { class: 'kv' }, pairs.filter(p => p).flatMap(([k, v]) => [h('dt', {}, k), h('dd', {}, v ?? '–')])); }
+function tile(k, v, s, extra = {}) { return h('div', { class: 'tile', ...extra }, h('div', { class: 'k' }, k), h('div', { class: 'v' }, v), s ? h('div', { class: 's' }, s) : null); }
+function rawJson(title, obj) { return h('details', {}, h('summary', {}, title), h('pre', { class: 'json' }, JSON.stringify(obj, null, 1))); }
+function guard(title, fn) { try { return fn(); } catch (e) { console.error(e); return h('section', {}, h('h2', {}, title), h('p', { class: 'err' }, 'Could not render: ' + e.message)); } }
+
+// Sequential blue ramp (light -> dark) and diverging blue <-> red with neutral mid.
+const SEQ = ['#cde2fb', '#9ec5f4', '#6da7ec', '#3987e5', '#256abf', '#184f95', '#0d366b'];
+function lerpHex(a, b, t) { const p = x => [1, 3, 5].map(i => parseInt(x.slice(i, i + 2), 16)); const A = p(a), B = p(b);
+  return '#' + A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, '0')).join(''); }
+function rampColor(stops, t) { t = Math.max(0, Math.min(1, t)); const x = t * (stops.length - 1), i = Math.min(Math.floor(x), stops.length - 2); return lerpHex(stops[i], stops[i + 1], x - i); }
+const seq = (v, max) => rampColor(SEQ, v / max);
+function div(v, lim) { const mid = css('--mid') || '#f0efec'; const t = Math.max(-1, Math.min(1, v / lim));
+  return t < 0 ? lerpHex(mid, '#1c5cab', -t) : lerpHex(mid, '#e34948', t); }
+const STATUS = { ok: null, 'shadow on another roof': 'var(--warning)', 'no shadow found': 'var(--faint)', 'outline mismatch': 'var(--critical)', 'too small': 'var(--faint)' };
+
+let STATE = {};
+
+// ------------------------------------------------------------------ Building picker
+let CATALOG = [], BUILDINGS = [], BY_SID = {}, ENUMS = {}, NAMES = {}, CURRENT = null;
+const PICK = { q: '', kind: '', city: '', sort: 'scan', scanOnly: false, limit: 200 };
+const enumName = (e, v) => v == null ? null : String(ENUMS[e]?.[String(v)] ?? v).replace(/([a-z])([A-Z])/g, '$1 $2');
+const params = () => new URLSearchParams(location.search);
+const rowTitle = r => r.name || r.address || 'Address not disclosed';
+const rowSummary = r => r.kind === 'residential'
+  ? [r.price ? money(r.price) : null, r.beds != null ? `${r.beds} bd` : null, r.baths != null ? `${r.baths} ba` : null, r.sqft ? `${fmt(r.sqft, 0)} sq ft` : null, r.year ? `built ${r.year}` : null].filter(Boolean).join(' · ')
+  : [r.type, r.stories ? `${r.stories} stories` : null, r.sqft ? `${fmt(r.sqft, 0)} sq ft` : null, r.year ? `built ${r.year}` : null].filter(Boolean).join(' · ');
+
+function setNav(links) {
+  const sid = params().get('m');
+  $('#sectionNav').replaceChildren(...links.map(([href, t]) => h('a', { href }, t)),
+    h('a', { href: '/acoustics' + (sid ? '?m=' + encodeURIComponent(sid) : ''), title: 'Room acoustics app (port 8766)' }, 'Acoustics ↗'),
+    h('a', { href: '/keys' }, 'Key check'));
+}
+
+// One building = one CoStar listing / property; it can hold many Matterport scans (suites, units).
+function groupBuildings() {
+  const byKey = new Map();
+  for (const r of CATALOG) {
+    const key = r.kind + ':' + r.costar_id;
+    if (!byKey.has(key)) byKey.set(key, { ...r, key, rows: [] });
+    byKey.get(key).rows.push(r);
+    BY_SID[r.sid] = r; r.key = key;
+  }
+  BUILDINGS = [...byKey.values()];
+  for (const b of BUILDINGS) {
+    b.cachedCount = b.rows.filter(r => r.cached).length;
+    b._hay = [b.address, b.name, b.city, b.state, b.type, b.costar_id, ...b.rows.map(r => r.sid)].filter(Boolean).join(' ').toLowerCase();
+  }
+}
+const buildingOf = sid => BUILDINGS.find(b => b.key === BY_SID[sid]?.key);
+
+function filtered() {
+  const words = PICK.q.toLowerCase().split(/\s+/).filter(Boolean);
+  const rows = BUILDINGS.filter(b => (!PICK.kind || b.kind === PICK.kind) && (!PICK.city || b.city === PICK.city) && (!PICK.scanOnly || b.cachedCount)
+    && (!words.length || words.every(w => b._hay.includes(w))));
+  const num = k => (a, b) => (b[k] ?? -Infinity) - (a[k] ?? -Infinity);
+  const byAddr = (a, b) => rowTitle(a).localeCompare(rowTitle(b));
+  const cmp = { scan: (a, b) => (b.cachedCount - a.cachedCount) || (b.rows.length - a.rows.length) || byAddr(a, b), address: byAddr,
+    price: num('price'), sqft: num('sqft'), stories: num('stories'), year: num('year') }[PICK.sort];
+  return rows.sort(cmp);
+}
+
+function renderList() {
+  const rows = filtered(), list = $('#list'), cur = BY_SID[CURRENT]?.key;
+  const scans = rows.reduce((a, b) => a + b.rows.length, 0);
+  $('#count').textContent = `${fmt(rows.length, 0)} of ${fmt(BUILDINGS.length, 0)} buildings · ${fmt(scans, 0)} scans` + (rows.length > PICK.limit ? ` · showing ${PICK.limit}` : '');
+  list.replaceChildren(...rows.slice(0, PICK.limit).map(b => h('li', {}, h('button', {
+      'aria-current': b.key === cur ? 'true' : 'false', 'data-key': b.key,
+      onclick: () => selectBuilding((b.rows.find(r => r.cached) || b.rows[0]).sid) },
+    h('div', { class: 't' }, h('span', {}, rowTitle(b)),
+      h('span', { style: 'display:flex;gap:4px' },
+        b.cachedCount ? h('span', { class: 'badge scan', title: 'Scan, aerial and outline data downloaded' }, 'data') : null,
+        b.rows.length > 1 ? h('span', { class: 'badge', style: 'background:var(--surface-2);color:var(--muted)', title: 'Matterport scans of spaces in this building' }, `${b.rows.length} scans`) : null,
+        h('span', { class: 'badge ' + (b.kind === 'residential' ? 'res' : 'com') }, b.kind === 'residential' ? 'Res' : 'Com'))),
+    h('div', { class: 'd' }, (b.name ? b.address + ', ' : '') + `${b.city}, ${b.state}`),
+    h('div', { class: 'd' }, rowSummary(b) || h('span', { class: 'mono' }, b.rows[0].sid))))));
+  if (rows.length > PICK.limit) list.append(h('li', {}, h('button', { class: 'more', onclick: () => { PICK.limit += 300; renderList(); } }, `Show more (${fmt(rows.length - PICK.limit, 0)} left)…`)));
+}
+
+function initPicker() {
+  groupBuildings();
+  const cities = [...new Set(BUILDINGS.map(b => `${b.city}|${b.state}`))].sort();
+  cities.forEach(c => { const [city, st] = c.split('|'); $('#citySel').append(h('option', { value: city }, `${city}, ${st} (${fmt(BUILDINGS.filter(b => b.city === city).length, 0)})`)); });
+  let t; $('#q').addEventListener('input', e => { clearTimeout(t); t = setTimeout(() => { PICK.q = e.target.value; PICK.limit = 200; renderList(); }, 120); });
+  $('#kindSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; PICK.kind = b.dataset.k; PICK.limit = 200;
+    $('#kindSeg').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b ? 'true' : 'false')); renderList(); });
+  $('#citySel').onchange = e => { PICK.city = e.target.value; PICK.limit = 200; renderList(); };
+  $('#sortSel').onchange = e => { PICK.sort = e.target.value; renderList(); };
+  $('#scanOnly').onchange = e => { PICK.scanOnly = e.target.checked; PICK.limit = 200; renderList(); };
+  window.addEventListener('popstate', () => { const sid = params().get('m'); if (sid && sid !== CURRENT) selectBuilding(sid, { push: false }); });
+}
+
+async function main() {
+  const hdr = $('header.top');
+  new ResizeObserver(() => document.documentElement.style.setProperty('--hdr', hdr.offsetHeight + 'px')).observe(hdr);
+  [CATALOG, ENUMS] = await Promise.all([
+    fetch('/api/catalog').then(r => r.json()),
+    fetch('/api/enums').then(r => r.ok ? r.json() : {}).catch(() => ({}))]);
+  initPicker();
+  const first = params().get('m') || CATALOG.find(r => r.cached)?.sid || CATALOG[0]?.sid;
+  renderList();
+  if (first) selectBuilding(first, { push: false, room: params().get('room') });
+}
+
+// The scans (suites / units) of the current building, so you can switch between them.
+function scansBar(sid) {
+  const b = buildingOf(sid);
+  if (!b || b.rows.length < 2) return null;
+  const btns = {};
+  const label = r => NAMES[r.sid] || r.sid;
+  const wrap = h('div', { class: 'rooms-chips', role: 'group', 'aria-label': 'Scans in this building' },
+    b.rows.slice().sort((x, y) => (y.cached - x.cached) || label(x).localeCompare(label(y))).map(r =>
+      btns[r.sid] = h('button', { 'aria-pressed': r.sid === sid ? 'true' : 'false', title: r.sid, onclick: () => r.sid !== CURRENT && selectBuilding(r.sid) },
+        label(r), r.cached ? h('span', { class: 'badge scan', style: 'margin-left:6px' }, 'data') : null)));
+  const missing = b.rows.map(r => r.sid).filter(s => !(s in NAMES));
+  if (missing.length) fetch('/api/names?ids=' + missing.slice(0, 60).join(',')).then(r => r.json()).then(names => {
+    Object.assign(NAMES, names);
+    for (const [s, n] of Object.entries(names)) if (n && btns[s]) btns[s].firstChild.textContent = n;
+  }).catch(() => {});
+  return h('section', { id: 'scans', style: 'padding:14px 18px' },
+    h('h2', { style: 'font-size:1.05rem' }, `${b.rows.length} Matterport scans in this building`),
+    h('p', { class: 'sub small' }, `Each scan is a separate space (a suite or unit). ${b.cachedCount ? `${b.cachedCount} downloaded (marked “data”); the` : 'The'} others show the building’s CoStar records until you download them.`),
+    wrap);
+}
+
+async function selectBuilding(sid, { push = true, room = null } = {}) {
+  CURRENT = sid;
+  const row = BY_SID[sid];
+  if (push) history.pushState(null, '', '?m=' + sid);
+  else { const u = new URL(location); u.searchParams.set('m', sid); history.replaceState(null, '', u); }
+  document.querySelectorAll('#list button[data-key]').forEach(b => b.setAttribute('aria-current', b.dataset.key === row?.key ? 'true' : 'false'));
+  $('#hdrInfo').textContent = row ? `${rowTitle(row)} · ${row.city}` : sid;
+  const app = $('#app');
+  app.replaceChildren(h('p', { class: 'muted' }, 'Loading…'));
+  window.scrollTo({ top: 0 });
+  try {
+    if (row?.cached) await renderFull(sid, room);
+    else await renderKitOnly(sid, row);
+    const bar = CURRENT === sid && scansBar(sid);
+    if (bar) app.insertBefore(bar, app.children[1] || null);
+  } catch (e) { console.error(e); if (CURRENT === sid) app.replaceChildren(h('p', { class: 'err' }, 'Failed to load: ' + e.message)); }
+}
+
+// A building we only have kit records for: show them, and offer to download the rest.
+async function renderKitOnly(sid, row) {
+  const kit = await fetch('/api/kit/' + sid).then(r => r.json());
+  if (CURRENT !== sid) return;
+  const L = kit.listing, P = L?.property, C = kit.property;
+  const photo = L?.media?.find(m => /imagescdn|\.jpe?g/i.test(m.uri) && !/matterport/.test(m.uri))?.uri || C?.primaryPhoto?.attachmentUri;
+  const lat = row?.lat, lon = row?.lon;
+  const avail = [['CoStar kit records', !!(L || C)], ['Matterport scan & rooms', false], ['Vexcel aerial', false], ['LA County outlines', false], ['Shadow heights', false]];
+  const fetchBox = h('div', { class: 'callout', id: 'fetch' });
+  const btn = h('button', { class: 'primary', onclick: () => startFetch(sid, btn, fetchBox) }, 'Download scan, rooms & aerial data');
+  fetchBox.append(h('p', {}, h('b', {}, 'Rooms, floor plan, panoramas and aerial imagery are not downloaded for this building yet. '),
+      'This runs fetch_building.py and shadows.py for it (about 20 MB, under a minute; uses your Matterport and Vexcel keys).'),
+    h('div', { class: 'toolbar', style: 'margin:8px 0 0' }, btn, h('span', { class: 'muted small' }, 'Shadow heights only work where LA County outlines exist.')));
+  const hero = h('div', { class: 'hero' },
+    h('div', {},
+      h('div', { class: 'muted small mono' }, `${sid} · CoStar ${row?.kind} ${row?.costar_id}${row?.also_commercial ? ` · also commercial ${row.also_commercial}` : ''}`),
+      h('h1', {}, row?.name ? `${row.name}` : row?.address || sid),
+      h('p', { class: 'muted' }, [row?.name ? row.address : null, row ? `${row.city}, ${row.state}` : null, lat ? `${fmt(lat, 6)}, ${fmt(lon, 6)}` : null].filter(Boolean).join(' · ')),
+      row ? h('p', {}, rowSummary(row)) : null,
+      h('div', { class: 'chips' }, avail.map(([n, ok]) => h('span', { class: 'chip' }, h('span', { class: 'dot', style: `background:var(${ok ? '--good' : '--faint'})` }), n + (ok ? '' : ' (not downloaded)')))),
+      fetchBox,
+      h('p', { class: 'small' }, h('a', { href: `https://my.matterport.com/show/?m=${sid}`, target: '_blank', rel: 'noopener' }, 'Open the 3D tour on Matterport ↗'),
+        lat ? [' · ', h('a', { href: `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=18/${lat}/${lon}`, target: '_blank', rel: 'noopener' }, 'Map ↗')] : null)),
+    photo ? h('img', { src: photo, alt: 'Photo of ' + (row?.address || sid), referrerpolicy: 'no-referrer', onerror: e => e.target.replaceWith(h('div', { class: 'noimg' }, 'Kit photo could not be loaded')) }) : h('div', { class: 'noimg' }, 'No photo in the kit records'));
+  setNav([['#costar', 'CoStar']]);
+  $('#app').replaceChildren(hero, guard('CoStar', () => renderCostar({ costar: { listing: L, features: kit.features, property: C, match: { kind: row?.kind, id: row?.costar_id } } })));
+}
+
+async function startFetch(sid, btn, box) {
+  btn.disabled = true; btn.textContent = 'Downloading…';
+  const log = h('div', { class: 'joblog', 'aria-live': 'polite' }); box.append(log);
+  let job = await fetch('/api/fetch/' + sid, { method: 'POST' }).then(r => r.json());
+  while (job.state === 'running') {
+    log.textContent = job.log.join('\n'); log.scrollTop = log.scrollHeight;
+    await new Promise(r => setTimeout(r, 1200));
+    job = await fetch('/api/fetch/' + sid).then(r => r.json());
+  }
+  log.textContent = job.log.join('\n'); log.scrollTop = log.scrollHeight;
+  if (job.state === 'done') {
+    const row = CATALOG.find(r => r.sid === sid); if (row) row.cached = true;
+    renderList();
+    if (CURRENT === sid) selectBuilding(sid, { push: false });
+  } else { btn.disabled = false; btn.textContent = 'Retry download'; box.append(h('p', { class: 'err' }, 'The download failed; see the log above.')); }
+}
+
+// A building with everything downloaded: the full explorer.
+async function renderFull(sid, room) {
+  const base = `data/${sid}/`;
+  const [bundle, shadows] = await Promise.all([
+    fetch(base + 'bundle.json').then(r => r.json()),
+    fetch(base + 'shadows.json').then(r => r.ok ? r.json() : null).catch(() => null)]);
+  if (CURRENT !== sid) return;
+  STATE = { sid, base, bundle, shadows, room };
+  setNav([['#rooms', 'Rooms'], ['#shadows', 'Shadow heights'], ['#matterport', 'Matterport'], ['#drone', 'Drone & splat'], ['#vexcel', 'Vexcel'], ['#costar', 'CoStar'], ['#osm', 'Outlines']]);
+  const app = $('#app');
+  app.replaceChildren(
+    guard('Overview', () => renderHero(bundle, shadows, base)),
+    guard('Rooms', () => renderRooms(bundle, base, room)),
+    shadows ? guard('Shadow heights', () => renderShadows(bundle, shadows, base)) : h('section', { id: 'shadows' }, h('h2', {}, 'Shadow heights'), h('p', {}, 'From backend/, run python3 -m app.pipeline.shadows --model with this scan ID.')),
+    guard('Matterport', () => renderMatterport(bundle, base)),
+    guard('Drone & splat', () => renderDrone(bundle)),
+    guard('Vexcel', () => renderVexcel(bundle, base)),
+    guard('CoStar', () => renderCostar(bundle)),
+    shadows ? guard('Outlines', () => renderOutlines(bundle, shadows)) : null,
+  );
+  if (bundle.errors?.length) app.prepend(h('p', { class: 'err' }, 'Fetch errors: ' + bundle.errors.join('; ')));
+}
+
+// ------------------------------------------------------------------ Overview
+function renderHero(b, s, base) {
+  const m = b.matterport.basics, cs = b.costar || {}, L = cs.listing, P = L?.property;
+  const src = [
+    ['Matterport', !!b.matterport], ['Vexcel', !!b.vexcel], ['CoStar', !!cs.match], ['Drone + splat', !!b.site?.available],
+    ['LA County outlines', !!b.osm], ['Shadow heights', !!s]];
+  return h('div', { class: 'hero' },
+    h('div', {},
+      h('div', { class: 'muted small mono' }, b.sid + (cs.match ? ` · CoStar ${cs.match.kind} ${cs.match.id}` : '')),
+      h('h1', {}, m.address?.address || m.name),
+      h('p', { class: 'muted' }, `${fmt(+m.geolocation.lat, 6)}, ${fmt(+m.geolocation.long, 6)} · ${m.floors.length} floor · ${m.rooms.length} rooms · ${m.panoLocations.length} scan positions`),
+      P ? h('p', {}, `${P.bedsMax} bed · ${P.bathsMax} bath · ${fmt(P.sqftMax, 0)} sq ft · built ${P.yearBuilt} · ${P.stories} story · ${money(L.currentPrice)}`) : null,
+      h('div', { class: 'chips' }, src.map(([n, ok]) => h('span', { class: 'chip' }, h('span', { class: 'dot', style: `background:var(${ok ? '--good' : '--faint'})` }), n + (ok ? '' : ' (missing)')))),
+      s ? h('div', { class: 'callout' },
+        h('p', {}, h('b', {}, 'From one aerial photo with no timestamp: '),
+          `the sun stood ${s.sun_elevation}° above the horizon at azimuth ${s.sun_azimuth}°, calibrated on ${s.reference.name} (${s.reference.height_source}). ` +
+          `Heights for ${s.status_counts.ok} buildings, median error ${s.validation.median_abs_err_m} m against LA County's measured heights.`)) : null),
+    b.matterport.preview_size ? h('img', { src: base + 'preview.jpg', alt: 'Matterport preview of ' + m.name }) : null);
+}
+
+// ------------------------------------------------------------------ Shadows
+function renderShadows(b, s, base) {
+  const ref = s.reference, v = s.validation, B = s.buildings;
+  const byId = Object.fromEntries(B.map(x => [x.osm_id, x]));
+  const D = s.display_px;
+  const sec = h('section', { id: 'shadows' },
+    h('h2', {}, 'Building heights from shadows'),
+    h('p', { class: 'sub' }, 'No capture time needed: one CoStar building with a known story count calibrates the sun angle for the whole image, then every shadow length becomes a height.'));
+
+  const cands = s.capture_candidates.map(c => c.local).join(' or ') || 'none within 3°';
+  sec.append(h('div', { class: 'tiles' },
+    tile('Shadows point', `${s.shadow_bearing}°`, 'compass bearing, found from the image'),
+    tile('Sun elevation', `${s.sun_elevation}°`, `${s.sun_elevation_range[0]}–${s.sun_elevation_range[1]}° from story-height range`),
+    tile('Reference', ref.name.replace(' by Category', ''), `${ref.height_m} m tall, ${ref.shadow_m} m shadow`),
+    tile('Median error', `${v.median_abs_err_m} m`, `vs LA County on ${v.n} buildings (bias ${v.bias_m > 0 ? '+' : ''}${v.bias_m} m)`),
+    tile('Photo taken around', s.capture_candidates[0]?.local.split(',')[0] || '–', cands)));
+
+  // Map
+  const mode = h('select', { 'aria-label': 'Color buildings by' },
+    h('option', { value: 'est' }, 'Estimated height'), h('option', { value: 'gt' }, 'LA County height'),
+    h('option', { value: 'err' }, 'Error (estimate − LA County)'), h('option', { value: 'status' }, 'Measurement status'));
+  const mask = h('input', { type: 'checkbox' }); const outl = h('input', { type: 'checkbox', checked: true });
+  const toolbar = h('div', { class: 'toolbar' }, h('label', {}, 'Color by', mode),
+    h('label', {}, outl, 'Outlines'), h('label', {}, mask, 'Shadow mask'));
+  const svg = h('svg', { viewBox: `0 0 ${D} ${D}` });
+  const maskImg = h('img', { src: base + 'shadow_mask.png', alt: '', style: 'display:none' });
+  const stage = h('div', { class: 'stage' }, h('img', { src: base + 'ortho.jpg', alt: 'Vexcel ortho of the block' }), maskImg, svg);
+  const zoom = { k: 1, x: 0, y: 0 };
+  const map = h('div', { class: 'map' }, stage, h('div', { class: 'ctrls' },
+    h('button', { title: 'Zoom in', onclick: () => zoomBy(1.5) }, '+'), h('button', { title: 'Zoom out', onclick: () => zoomBy(1 / 1.5) }, '−'),
+    h('button', { title: 'Reset view', onclick: () => { Object.assign(zoom, { k: 1, x: 0, y: 0 }); apply(); } }, '⟲')));
+  function apply() { const w = map.clientWidth; zoom.k = Math.max(1, Math.min(8, zoom.k));
+    zoom.x = Math.min(0, Math.max(w - w * zoom.k, zoom.x)); zoom.y = Math.min(0, Math.max(w - w * zoom.k, zoom.y));
+    stage.style.transform = `translate(${zoom.x}px,${zoom.y}px) scale(${zoom.k})`; }
+  function zoomBy(f, cx, cy) { const w = map.clientWidth; cx ??= w / 2; cy ??= w / 2;
+    zoom.x = cx - (cx - zoom.x) * f; zoom.y = cy - (cy - zoom.y) * f; zoom.k *= f; apply(); }
+  map.addEventListener('wheel', e => { e.preventDefault(); const r = map.getBoundingClientRect(); zoomBy(e.deltaY < 0 ? 1.2 : 1 / 1.2, e.clientX - r.left, e.clientY - r.top); }, { passive: false });
+  let drag = null;
+  map.addEventListener('pointerdown', e => { if (e.target.closest('.ctrls')) return; drag = { x: e.clientX, y: e.clientY, zx: zoom.x, zy: zoom.y, moved: false }; map.classList.add('dragging'); });
+  addEventListener('pointermove', e => { if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true; zoom.x = drag.zx + dx; zoom.y = drag.zy + dy; apply(); });
+  addEventListener('pointerup', () => { if (drag) setTimeout(() => drag = null, 0); map.classList.remove('dragging'); });
+  function focusOn(px, py, k = 3) { const w = map.clientWidth, f = w / D; zoom.k = k; zoom.x = w / 2 - px * f * k; zoom.y = w / 2 - py * f * k; apply(); }
+
+  const panel = h('div', { class: 'panel' }, h('h4', {}, 'Click a building'), h('p', { class: 'muted small' }, 'Hover for details, scroll or use +/− to zoom, drag to pan.'));
+  const legend = h('div', { class: 'legend' });
+  const maxH = 20;
+  const polys = {};
+  let selected = null;
+  function color(bd) {
+    const m = mode.value;
+    if (m === 'status') return bd.status === 'ok' ? 'var(--good)' : STATUS[bd.status];
+    if (bd.status !== 'ok') return null;
+    if (m === 'est') return bd.est_h != null ? seq(bd.est_h, maxH) : null;
+    if (m === 'gt') return bd.lacounty_h != null ? seq(bd.lacounty_h, maxH) : null;
+    if (m === 'err') return bd.lacounty_h != null && bd.est_h != null ? div(bd.est_h - bd.lacounty_h, 8) : null;
+  }
+  function describe(bd, inPanel) {
+    const rows = [
+      !inPanel && bd.reference ? `<b>Reference: ${bd.reference}</b>` : '', !inPanel && bd.osm_id === s.target_osm_id ? '<b>This house</b>' : '',
+      `Status: ${bd.status}`, bd.est_h != null ? `Estimated height: <b>${bd.est_h} m</b> (${bd.est_range[0]}–${bd.est_range[1]})` : '',
+      bd.lacounty_h != null ? `LA County height: ${bd.lacounty_h} m` : 'LA County height: none',
+      bd.shadow_m != null ? `Shadow: ${bd.shadow_m} m (80th pct of ${bd.rows} rows)` : '',
+      bd.start_date ? `Built: ${bd.start_date} (outline record)` : '', `Footprint: ${fmt(bd.area_m2, 0)} m² · ${bd.distance_m} m from the house`];
+    return rows.filter(Boolean).join('<br>');
+  }
+  function select(id, from) {
+    selected = id; const bd = byId[id];
+    Object.entries(polys).forEach(([k, p]) => p.setAttribute('stroke-width', +k === id ? 4 : p.dataset.sw));
+    panel.replaceChildren(h('h4', {}, bd.reference ? `Reference: ${bd.reference}` : bd.osm_id === s.target_osm_id ? 'This house' : `Building ${bd.osm_id}`),
+      h('div', { html: describe(bd, true) }),
+      bd.lacounty_h != null && bd.est_h != null ? h('p', { class: 'small' }, `Error: ${(bd.est_h - bd.lacounty_h).toFixed(1)} m`) : null,
+      h('p', { class: 'small' }, h('a', { href: `https://www.openstreetmap.org/way/${bd.osm_id}`, target: '_blank', rel: 'noopener' }, 'OSM way ' + bd.osm_id)));
+    document.querySelectorAll('#bldTable tr').forEach(tr => tr.classList.toggle('sel', +tr.dataset.id === id));
+    if (from === 'table' || from === 'scatter') { const pts = bd.pts; focusOn(pts.reduce((a, p) => a + p[0], 0) / pts.length, pts.reduce((a, p) => a + p[1], 0) / pts.length); map.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+  }
+  STATE.selectBuilding = select;
+  function draw() {
+    svg.replaceChildren(); legend.replaceChildren();
+    const g = h('g', { style: outl.checked ? '' : 'display:none' });
+    for (const bd of B) {
+      const c = color(bd), isRef = !!bd.reference, isT = bd.osm_id === s.target_osm_id;
+      const stroke = isRef ? 'var(--ref)' : isT ? 'var(--target)' : c || 'rgba(255,255,255,.75)';
+      const sw = isRef || isT ? 3.5 : 1.3;
+      const p = h('polygon', { points: bd.pts.map(q => q.join(',')).join(' '), fill: c || 'none', 'fill-opacity': c ? (mode.value === 'status' ? .35 : .62) : 0,
+        stroke, 'stroke-width': selected === bd.osm_id ? 4 : sw, 'data-sw': sw, 'stroke-dasharray': c || isRef || isT ? null : '4 3',
+        onmousemove: e => showTip(e, describe(bd)), onmouseleave: hideTip, onclick: () => { if (!drag?.moved) select(bd.osm_id); } });
+      polys[bd.osm_id] = p; g.append(p);
+    }
+    svg.append(g);
+    // CoStar buildings + labels
+    for (const c of b.costar.nearby) {
+      const x = c.px[0] * D / b.vexcel.box.size_px, y = c.px[1] * D / b.vexcel.box.size_px;
+      svg.append(h('circle', { cx: x, cy: y, r: 7, fill: 'var(--costar)', stroke: '#fff', 'stroke-width': 2,
+        onmousemove: e => showTip(e, `<b>CoStar: ${c.name || c.address}</b><br>${c.stories ?? '?'} stories · ${c.distance_m} m away`), onmouseleave: hideTip }));
+    }
+    const tx = D / 2, ty = D / 2;
+    svg.append(h('circle', { cx: tx, cy: ty, r: 6, fill: 'var(--target)', stroke: '#fff', 'stroke-width': 2 }));
+    // Compass: shadow direction and sun direction
+    const cx = 110, cy = 110, r = 70, br = s.shadow_bearing * Math.PI / 180;
+    const ux = Math.sin(br), uy = -Math.cos(br);
+    svg.append(h('g', {},
+      h('circle', { cx, cy, r: r + 18, fill: 'rgba(0,0,0,.55)' }),
+      h('text', { x: cx, y: cy - r - 4, 'text-anchor': 'middle', fill: '#fff', 'font-size': 20, 'font-weight': 700 }, 'N'),
+      h('line', { x1: cx - ux * r, y1: cy - uy * r, x2: cx + ux * r * .85, y2: cy + uy * r * .85, stroke: '#9ec5f4', 'stroke-width': 5 }),
+      h('polygon', { points: `${cx + ux * r},${cy + uy * r} ${cx + ux * r * .7 - uy * 12},${cy + uy * r * .7 + ux * 12} ${cx + ux * r * .7 + uy * 12},${cy + uy * r * .7 - ux * 12}`, fill: '#9ec5f4' }),
+      h('circle', { cx: cx - ux * r, cy: cy - uy * r, r: 13, fill: '#fab219', stroke: '#fff', 'stroke-width': 2 }),
+      h('text', { x: cx, y: cy + r + 36, 'text-anchor': 'middle', fill: '#fff', 'font-size': 17 }, `sun ${s.sun_azimuth}° · ${s.sun_elevation}° up`)));
+    // Legend
+    const m = mode.value;
+    if (m === 'est' || m === 'gt') legend.append(h('span', {}, '0 m', h('span', { class: 'ramp', style: `background:linear-gradient(90deg,${SEQ.join(',')})` }), `${maxH}+ m`));
+    if (m === 'err') legend.append(h('span', {}, '−8 m (too low)', h('span', { class: 'ramp', style: `background:linear-gradient(90deg,#1c5cab,${css('--mid')},#e34948)` }), '+8 m (too high)'));
+    if (m === 'status') Object.entries({ 'measured': 'var(--good)', 'shadow falls on another roof': 'var(--warning)', 'no shadow found / too small': 'var(--faint)', 'outline mismatch': 'var(--critical)' })
+      .forEach(([k, c]) => legend.append(h('span', {}, h('span', { class: 'sw', style: `background:${c}` }), k)));
+    legend.append(h('span', {}, h('span', { class: 'sw', style: 'background:var(--ref)' }), 'reference building'),
+      h('span', {}, h('span', { class: 'sw', style: 'background:var(--target)' }), 'this house'),
+      h('span', {}, h('span', { class: 'sw', style: 'background:var(--costar);border-radius:50%' }), 'CoStar property'),
+      m !== 'status' ? h('span', {}, h('span', { class: 'sw', style: 'border:1.5px dashed var(--muted)' }), 'not measured') : null);
+  }
+  mode.onchange = draw; outl.onchange = draw; mask.onchange = () => maskImg.style.display = mask.checked ? '' : 'none';
+  draw();
+  sec.append(toolbar, h('div', { class: 'mapwrap' }, h('div', {}, map, legend),
+    h('div', {}, panel,
+      h('h3', {}, 'Calibration'),
+      h('table', {}, h('thead', {}, h('tr', {}, h('th', {}, 'CoStar building'), h('th', { class: 'num' }, 'Height'), h('th', { class: 'num' }, 'Shadow'), h('th', { class: 'num' }, 'Implied sun'))),
+        h('tbody', {}, s.references.map(r => h('tr', { style: r === ref || r.costar_id === ref.costar_id ? 'font-weight:600' : '' },
+          h('td', {}, (r.name || '').replace(' by Category', '') + (r.costar_id === ref.costar_id ? ' ✓' : '')),
+          h('td', { class: 'num' }, r.height_m + ' m'), h('td', { class: 'num' }, r.shadow_m ? r.shadow_m + ' m' : '–'),
+          h('td', { class: 'num' }, r.elevation ? r.elevation + '°' : r.why_not ? 'unusable' : '–'))))),
+      h('p', { class: 'small muted' }, 'The reference with the longest shadow for its height wins: errors (a neighbor cutting the shadow off, an outline set back from the roof edge) only ever shorten shadows.'),
+      h('p', { class: 'small muted' }, `Plausible noon sun here: ${s.plausible_noon_elevation.dec_solstice}° (Dec) to ${s.plausible_noon_elevation.jun_solstice}° (Jun).`))));
+
+  // Charts
+  sec.append(h('div', { class: 'grid2' },
+    h('div', {}, h('h3', {}, 'Estimated vs measured height'), scatter(v, byId, select),
+      h('p', { class: 'small muted' }, `${v.n} buildings with a clean shadow and an LA County height (reference excluded). r = ${v.pearson_r}, ${Math.round(v.within_1_5m * 100)}% within 1.5 m. ${v.note} Best-fit sun elevation from the LA County heights: ${v.best_fit_elevation_deg}° (calibrated: ${s.sun_elevation}°).`)),
+    h('div', {}, h('h3', {}, 'Finding the shadow direction'), dirChart(s),
+      h('p', { class: 'small muted' }, 'For each compass bearing: the share of pixels just outside every building outline (1.5–6 m out in that direction) that are shadow. One sun cast every shadow, so the peak is the shadow direction for the whole image.'))));
+  sec.append(h('details', {}, h('summary', {}, 'How it works, and its limits'),
+    h('ol', { class: 'small' },
+      h('li', {}, 'Shadow mask: pixels that are dark and bluish (shadows are lit only by blue skylight). Toggle "Shadow mask" above.'),
+      h('li', {}, 'Direction: the bearing where outlines shifted outward hit shadow most often (chart above).'),
+      h('li', {}, 'Length: rotate the image so shadows point right; for each row of an outline, count the dark run past its leeward edge (up to 2.5 m of lit roof allowed first, for outlines set back from the roof edge). The building’s shadow is the 80th percentile across rows.'),
+      h('li', {}, 'Calibration: tan(sun elevation) = reference height ÷ reference shadow. Height of everything else = shadow × that tan.'),
+      h('li', {}, 'Validation: LA County’s LiDAR heights (in the OpenStreetMap outlines) never feed the estimate.')),
+    h('p', { class: 'small' }, h('b', {}, 'Known limits: '), 'outlines come from an older survey, so redeveloped lots (the Lex sites themselves) have house outlines and house heights; pitched roofs cast shorter shadows than their ridge, so estimates run low on houses; shadows that land on another roof, or merge with a tree or a taller neighbor’s shadow, are flagged or inflate the estimate; the direction peak is broad (±5°) because the street grid lines buildings up north–south.')));
+  setTimeout(() => focusOn(D / 2 + 60, D / 2 + 60, 1.6), 0);
+  return sec;
+}
+
+function scatter(v, byId, onPick) {
+  const W = 520, H = 380, m = { l: 44, r: 14, t: 12, b: 38 };
+  const pts = v.points; const max = Math.min(40, Math.ceil(Math.max(...pts.map(p => Math.max(p[0], p[1]))) / 5) * 5);
+  const x = d => m.l + d / max * (W - m.l - m.r), y = d => H - m.b - Math.min(d, max) / max * (H - m.t - m.b);
+  const svg = h('svg', { class: 'chart', viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'Scatter of estimated vs LA County height' });
+  const g = h('g', { class: 'grid' });
+  for (let t = 0; t <= max; t += 5) { g.append(h('line', { x1: x(0), x2: x(max), y1: y(t), y2: y(t) })); svg.append(h('text', { x: m.l - 6, y: y(t) + 4, 'text-anchor': 'end' }, t), h('text', { x: x(t), y: H - m.b + 16, 'text-anchor': 'middle' }, t)); }
+  svg.prepend(g);
+  svg.append(h('polygon', { points: `${x(0)},${y(1.5)} ${x(max - 1.5)},${y(max)} ${x(max)},${y(max)} ${x(max)},${y(max - 1.5)} ${x(1.5)},${y(0)} ${x(0)},${y(0)}`, fill: 'var(--surface-2)', opacity: .9 }));
+  svg.append(h('line', { x1: x(0), y1: y(0), x2: x(max), y2: y(max), stroke: 'var(--muted)', 'stroke-dasharray': '5 4', 'stroke-width': 1.5 }));
+  svg.append(h('text', { x: x(max) - 4, y: y(max) + 14, 'text-anchor': 'end' }, 'perfect'));
+  svg.append(h('text', { x: (m.l + W - m.r) / 2, y: H - 4, 'text-anchor': 'middle' }, 'LA County measured height (m)'));
+  svg.append(h('text', { x: 12, y: (m.t + H - m.b) / 2, 'text-anchor': 'middle', transform: `rotate(-90 12 ${(m.t + H - m.b) / 2})` }, 'Estimated from shadow (m)'));
+  for (const [gt, est, id] of pts) {
+    const c = h('circle', { cx: x(gt), cy: y(est), r: 4.5, fill: '#2a78d6', stroke: 'var(--surface)', 'stroke-width': 2, style: 'cursor:pointer' });
+    const hit = h('circle', { cx: x(gt), cy: y(est), r: 9, fill: 'transparent', style: 'cursor:pointer',
+      onmousemove: e => { c.setAttribute('r', 6.5); showTip(e, `LA County ${gt} m · estimate ${est} m<br>error ${(est - gt).toFixed(1)} m${est > max ? ' (off chart)' : ''}<br><span style="opacity:.75">click to show on map</span>`); },
+      onmouseleave: () => { c.setAttribute('r', 4.5); hideTip(); }, onclick: () => onPick(id, 'scatter') });
+    svg.append(c, hit);
+  }
+  return svg;
+}
+
+function dirChart(s) {
+  const W = 520, H = 260, m = { l: 40, r: 14, t: 12, b: 36 };
+  const P = s.direction_profile.map(([b, v]) => [((b % 360) + 360) % 360, v]).sort((a, b) => a[0] - b[0]);
+  const max = Math.ceil(Math.max(...P.map(p => p[1])) * 10) / 10;
+  const x = d => m.l + d / 360 * (W - m.l - m.r), y = d => H - m.b - d / max * (H - m.t - m.b);
+  const svg = h('svg', { class: 'chart', viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'Shadow score by compass bearing' });
+  const g = h('g', { class: 'grid' });
+  for (let t = 0; t <= max + 1e-9; t += 0.1) { g.append(h('line', { x1: x(0), x2: x(360), y1: y(t), y2: y(t) })); svg.append(h('text', { x: m.l - 6, y: y(t) + 4, 'text-anchor': 'end' }, Math.round(t * 100) + '%')); }
+  svg.append(g);
+  [['N', 0], ['E', 90], ['S', 180], ['W', 270], ['N', 360]].forEach(([n, d]) => svg.append(h('text', { x: x(d), y: H - m.b + 16, 'text-anchor': 'middle' }, `${n} ${d}°`)));
+  svg.append(h('text', { x: (m.l + W - m.r) / 2, y: H - 4, 'text-anchor': 'middle' }, 'Direction tested (compass bearing)'));
+  svg.append(h('polyline', { points: P.map(p => `${x(p[0])},${y(p[1])}`).join(' '), fill: 'none', stroke: '#2a78d6', 'stroke-width': 2, 'stroke-linejoin': 'round' }));
+  const bx = x(((s.shadow_bearing % 360) + 360) % 360);
+  svg.append(h('line', { x1: bx, x2: bx, y1: m.t, y2: H - m.b, stroke: 'var(--ref)', 'stroke-width': 1.5, 'stroke-dasharray': '4 3' }),
+    h('text', { x: Math.min(bx + 6, W - 120), y: m.t + 12, style: 'fill:var(--ink)' }, `peak ${s.shadow_bearing}°`));
+  const cross = h('line', { y1: m.t, y2: H - m.b, stroke: 'var(--muted)', 'stroke-width': 1, style: 'display:none' });
+  const dot = h('circle', { r: 4.5, fill: '#2a78d6', stroke: 'var(--surface)', 'stroke-width': 2, style: 'display:none' });
+  svg.append(cross, dot, h('rect', { x: m.l, y: m.t, width: W - m.l - m.r, height: H - m.t - m.b, fill: 'transparent',
+    onmousemove: e => { const r = svg.getBoundingClientRect(); const bearing = ((e.clientX - r.left) / r.width * W - m.l) / (W - m.l - m.r) * 360;
+      const p = P.reduce((a, q) => Math.abs(q[0] - bearing) < Math.abs(a[0] - bearing) ? q : a);
+      cross.setAttribute('x1', x(p[0])); cross.setAttribute('x2', x(p[0])); cross.style.display = ''; dot.setAttribute('cx', x(p[0])); dot.setAttribute('cy', y(p[1])); dot.style.display = '';
+      showTip(e, `bearing ${p[0]}°: ${(p[1] * 100).toFixed(1)}% shadow`); },
+    onmouseleave: () => { cross.style.display = dot.style.display = 'none'; hideTip(); } }));
+  return svg;
+}
+
+// ------------------------------------------------------------------ Matterport
+function renderMatterport(b, base) {
+  const M = b.matterport, m = M.basics;
+  const sec = h('section', { id: 'matterport' }, h('h2', {}, 'Matterport scan'), h('p', { class: 'sub' }, 'Model API (GraphQL) data, cached by fetch_building.py. Positions are in metres in the model’s own frame, which is not aligned to north.'));
+  const rooms = M.rooms.filter(r => r.label && r.label !== 'Void');
+  sec.append(h('div', { class: 'tiles' },
+    tile('Rooms', rooms.length, `${M.rooms.length} segments incl. voids`), tile('Scan positions', M.panos.length, '360° panoramas'),
+    tile('Labelled floor area', fmt(rooms.reduce((a, r) => a + (r.dimensions?.areaFloor || 0), 0), 0) + ' m²'),
+    tile('Walls', M.walls.length, 'edges in the wall graph'), tile('MatterPak', M.matterpak?.availability || '–', M.matterpak?.assets?.[0]?.status ? 'mesh + point cloud ' + M.matterpak.assets[0].status : '')));
+  sec.append(h('div', { class: 'grid2' },
+    kv([['Name', m.name], ['Model id', h('code', {}, m.id)], ['Visibility', m.visibility], ['Copied to hackathon org', date(m.created)],
+      ['Address', m.address?.address], ['Lat / lon', `${m.geolocation.lat}, ${m.geolocation.long}`],
+      ['Vision classification', (m.propertyClassifications || []).map(c => c.classification).join(', ') || '–'],
+      ['AI summary', m.generatedDescription?.summary || 'none for this model'], ['Defurnished view', m.view?.id ? h('code', {}, m.view.id) : 'none'],
+      ['MatterPak file', M.matterpak?.assets?.[0]?.filename || '–']]),
+    h('div', {}, h('div', { class: 'muted small' }, 'Capture notes'), h('p', { class: 'small' }, m.description || '–'))));
+
+  // Panorama
+  const pano = M.pano;
+  if (pano) {
+    const box = h('div', { class: 'pano', role: 'img', 'aria-label': 'Panorama, drag to look around', style: `background-image:url(${base + pano.file})` });
+    let off = 0, d0 = null;
+    box.addEventListener('pointerdown', e => { d0 = { x: e.clientX, off }; box.setPointerCapture(e.pointerId); });
+    box.addEventListener('pointermove', e => { if (!d0) return; off = d0.off + (e.clientX - d0.x); box.style.backgroundPositionX = off + 'px'; });
+    box.addEventListener('pointerup', () => d0 = null);
+    const bF = h('button', { 'aria-pressed': 'true' }, 'As scanned'), bD = h('button', { 'aria-pressed': 'false' }, 'Defurnished');
+    bF.onclick = () => { box.style.backgroundImage = `url(${base + pano.file})`; bF.setAttribute('aria-pressed', 'true'); bD.setAttribute('aria-pressed', 'false'); };
+    bD.onclick = () => { box.style.backgroundImage = `url(${base + pano.defurnished_file})`; bD.setAttribute('aria-pressed', 'true'); bF.setAttribute('aria-pressed', 'false'); };
+    sec.append(h('h3', {}, `Panorama: ${pano.room || 'scan'} (pano ${pano.label})`),
+      h('div', { class: 'toolbar' }, bF, pano.defurnished_file ? bD : null, h('span', { class: 'muted small' }, `Drag to look around · camera at (${pano.position.x.toFixed(2)}, ${pano.position.y.toFixed(2)}, ${pano.position.z.toFixed(2)}) m`)), box);
+  }
+
+  sec.append(h('p', { class: 'small' }, 'Floor plan, rooms and walls are in the ', h('a', { href: '#rooms' }, 'Rooms'), ' section above.'));
+
+  // 3D tour
+  const frame = h('iframe', { class: 'tour', title: 'Matterport 3D tour', allow: 'xr-spatial-tracking; fullscreen' });
+  const load = h('button', { onclick: () => { frame.src = `https://my.matterport.com/show/?m=${b.sid}&play=1&qs=1${window.MP_SDK_KEY ? '&applicationKey=' + encodeURIComponent(window.MP_SDK_KEY) : ''}`; load.remove(); } }, 'Load the 3D tour');
+  sec.append(h('h3', {}, '3D tour'), load, frame);
+  sec.append(rawJson('Raw Matterport basics', m), rawJson('Raw rooms', M.rooms));
+  return sec;
+}
+
+// ------------------------------------------------------------------ Rooms
+function polyArea(pts) { let a = 0; for (let i = 0; i < pts.length; i++) { const [x1, y1] = pts[i], [x2, y2] = pts[(i + 1) % pts.length]; a += x1 * y2 - x2 * y1; } return Math.abs(a) / 2; }
+function polyPerim(pts) { let p = 0; for (let i = 0; i < pts.length; i++) { const [x1, y1] = pts[i], [x2, y2] = pts[(i + 1) % pts.length]; p += Math.hypot(x2 - x1, y2 - y1); } return p; }
+function inPoly([x, y], pts) { let c = false; for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) { const [xi, yi] = pts[i], [xj, yj] = pts[j];
+  if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; }
+function distToPoly([x, y], pts) { let best = Infinity; for (let i = 0; i < pts.length; i++) { const [ax, ay] = pts[i], [bx, by] = pts[(i + 1) % pts.length];
+  const dx = bx - ax, dy = by - ay, L = dx * dx + dy * dy, t = L ? Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / L)) : 0;
+  best = Math.min(best, Math.hypot(x - ax - t * dx, y - ay - t * dy)); } return best; }
+const M2_TO_FT2 = 10.7639;
+
+function renderRooms(b, base, initialRoom) {
+  const M = b.matterport;
+  const sec = h('section', { id: 'rooms' }, h('h2', {}, 'Rooms'),
+    h('p', { class: 'sub' }, 'Pick a room on the plan, in the list or in the table to see everything the scan knows about it.'));
+  // Name each room; repeat labels get a number (Bedroom 1, Bedroom 2).
+  const rooms = M.rooms.filter(r => r.label !== 'Void');
+  const seen = {}, totals = {};
+  rooms.forEach(r => { const l = r.label || 'Unlabelled'; totals[l] = (totals[l] || 0) + 1; });
+  rooms.forEach(r => { const l = r.label || 'Unlabelled'; seen[l] = (seen[l] || 0) + 1; r._name = totals[l] > 1 ? `${l} ${seen[l]}` : l; });
+  rooms.sort((a, c) => (c.dimensions?.areaFloor || 0) - (a.dimensions?.areaFloor || 0));
+  const labelledArea = rooms.reduce((a, r) => a + (r.label ? r.dimensions?.areaFloor || 0 : 0), 0);
+  const floorName = id => M.floors.find(f => f.id === id)?.label || '–';
+  if (!rooms.length) { sec.append(h('p', { class: 'muted' }, 'The scan has no room segmentation.')); return sec; }
+
+  const card = h('div', { class: 'roomcard', 'aria-live': 'polite' });
+  const chips = h('div', { class: 'rooms-chips', role: 'group', 'aria-label': 'Rooms' });
+  const polyById = {}, rowById = {}, chipById = {};
+  let current = null;
+
+  function describe(r) {
+    const d = r.dimensions || {}, poly = r.polygon?.length > 2 ? r.polygon : null;
+    const panos = poly ? M.panos.filter(p => inPoly([p.position.x, p.position.y], poly)) : [];
+    const walls = poly ? M.walls.filter(w => w.floor === r.floor && distToPoly(w.a, poly) < 0.25 && distToPoly(w.b, poly) < 0.25) : [];
+    const wallLen = walls.reduce((a, w) => a + Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]), 0);
+    const share = r.label && labelledArea ? (d.areaFloor || 0) / labelledArea : null;
+    const shownPano = M.pano && panos.some(p => p.id === M.pano.id);
+    card.replaceChildren(
+      h('div', { class: 'muted small mono' }, `room ${r.id} · ${floorName(r.floor)}`),
+      h('h4', {}, r._name),
+      h('div', { class: 'tiles' },
+        tile('Floor area', `${fmt(d.areaFloor)} m²`, `${fmt((d.areaFloor || 0) * M2_TO_FT2, 0)} sq ft${share != null ? ` · ${fmt(share * 100, 0)}% of labelled area` : ''}`),
+        tile('Width × depth', d.width ? `${fmt(d.width, 2)} × ${d.depth ? fmt(d.depth, 2) : '–'} m` : '–', 'bounding dimensions from Matterport'),
+        tile('Ceiling', d.height ? `${fmt(d.height, 2)} m` : '–', d.height ? `volume ≈ ${fmt((d.areaFloor || 0) * d.height, 0)} m³` : 'not measured'),
+        tile('Perimeter', poly ? `${fmt(polyPerim(poly), 1)} m` : '–', poly ? `${walls.length} wall segments · ${fmt(wallLen, 1)} m of wall` : 'no outline in the scan'),
+        tile('Scan positions', panos.length, panos.length ? 'panos ' + panos.map(p => p.label).join(', ') : 'none inside the outline')),
+      h('p', { class: 'small muted' }, [
+        poly ? `Outline: ${poly.length} corners, ${fmt(polyArea(poly), 1)} m² by polygon.` : 'This segment has no outline, so it cannot be drawn on the plan.',
+        shownPano ? ' The panorama in the Matterport section was taken in this room.' : '',
+        ' Windows and light are not in the room data yet.'].join('')));
+  }
+
+  function select(id, { scroll = false } = {}) {
+    const r = rooms.find(x => x.id === id); if (!r) return;
+    current = id;
+    Object.entries(polyById).forEach(([k, p]) => p.classList.toggle('sel', k === id));
+    Object.entries(rowById).forEach(([k, tr]) => tr.classList.toggle('sel', k === id));
+    Object.entries(chipById).forEach(([k, c]) => c.setAttribute('aria-pressed', k === id ? 'true' : 'false'));
+    describe(r);
+    const u = new URL(location); u.searchParams.set('room', id); history.replaceState(null, '', u);
+    if (scroll) rowById[id]?.scrollIntoView({ block: 'nearest' });
+  }
+
+  rooms.forEach(r => { chipById[r.id] = h('button', { 'aria-pressed': 'false', onclick: () => select(r.id, { scroll: true }) }, r._name); chips.append(chipById[r.id]); });
+
+  const tbody = h('tbody');
+  for (const r of rooms) {
+    const d = r.dimensions || {};
+    rowById[r.id] = h('tr', { style: 'cursor:pointer', onclick: () => select(r.id),
+        onmouseenter: () => polyById[r.id]?.classList.add('on'), onmouseleave: () => polyById[r.id]?.classList.remove('on') },
+      h('td', {}, r._name), h('td', { class: 'num' }, fmt(d.areaFloor)), h('td', { class: 'num' }, fmt(d.width, 2)), h('td', { class: 'num' }, fmt(d.depth, 2)), h('td', { class: 'num' }, fmt(d.height, 2)));
+    tbody.append(rowById[r.id]);
+  }
+  const table = h('div', { class: 'tablebox' }, h('table', {}, h('thead', {}, h('tr', {}, h('th', {}, 'Room'), h('th', { class: 'num' }, 'Area m²'), h('th', { class: 'num' }, 'Width'), h('th', { class: 'num' }, 'Depth'), h('th', { class: 'num' }, 'Ceiling'))), tbody));
+
+  const fp = M.floorplans.find(f => f.flags.length === 1) || M.floorplans[0];
+  let planBox = h('p', { class: 'muted' }, 'No floor plan image for this scan.');
+  if (fp) {
+    const tx = x => (x - fp.origin.x) * fp.resolution, ty = y => fp.height - (y - fp.origin.y) * fp.resolution;
+    const svg = h('svg', { viewBox: `0 0 ${fp.width} ${fp.height}` });
+    for (const w of M.walls) svg.append(h('line', { x1: tx(w.a[0]), y1: ty(w.a[1]), x2: tx(w.b[0]), y2: ty(w.b[1]), stroke: '#eb6834', 'stroke-width': 9, 'stroke-linecap': 'round', opacity: .9 }));
+    for (const r of rooms) {
+      if (!(r.polygon?.length > 2)) continue;
+      const d = r.dimensions || {};
+      const text = `${r._name} · ${fmt(d.areaFloor)} m²${d.width ? ` · ${fmt(d.width, 2)} × ${fmt(d.depth, 2)} m` : ''}${d.height ? ` · ceiling ${fmt(d.height, 2)} m` : ''}`;
+      const p = h('polygon', { points: r.polygon.map(([x, y]) => `${tx(x)},${ty(y)}`).join(' '), tabindex: 0, role: 'button', 'aria-label': r._name,
+        onclick: () => select(r.id, { scroll: true }), onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(r.id, { scroll: true }); } },
+        onmousemove: e => { showTip(e, text); p.classList.add('on'); }, onmouseleave: () => { hideTip(); p.classList.remove('on'); } });
+      polyById[r.id] = p; svg.append(p);
+      const cx = r.polygon.reduce((a, q) => a + q[0], 0) / r.polygon.length, cy = r.polygon.reduce((a, q) => a + q[1], 0) / r.polygon.length;
+      if ((d.areaFloor || 0) > 4) svg.append(h('text', { x: tx(cx), y: ty(cy), 'text-anchor': 'middle', 'font-size': 34, 'font-weight': 600, fill: '#121a2b', 'pointer-events': 'none' }, r._name));
+    }
+    for (const p of M.panos) svg.append(h('circle', { cx: tx(p.position.x), cy: ty(p.position.y), r: p.id === M.pano?.id ? 16 : 9, fill: p.id === M.pano?.id ? 'none' : '#2a78d6', stroke: p.id === M.pano?.id ? '#6250d6' : '#fff', 'stroke-width': p.id === M.pano?.id ? 6 : 3, 'pointer-events': 'none' }));
+    planBox = h('div', {}, h('div', { class: 'plan' }, h('img', { src: base + fp.file, alt: 'Matterport floor plan' }), svg),
+      h('div', { class: 'legend' }, h('span', {}, h('span', { class: 'sw', style: 'background:#eb6834' }), 'walls (graph)'),
+        h('span', {}, h('span', { class: 'sw', style: 'background:#2a78d6;border-radius:50%' }), 'scan positions'),
+        h('span', {}, h('span', { class: 'sw', style: 'border:2px solid #6250d6;border-radius:50%' }), 'panorama in the Matterport section'),
+        h('span', {}, h('span', { class: 'sw', style: 'background:rgba(250,178,25,.5);border:1px solid #9a5f00' }), 'selected room')));
+  }
+  sec.append(chips, h('div', { class: 'grid2' }, planBox, h('div', {}, card, table)));
+  select(rooms.some(r => r.id === initialRoom) ? initialRoom : (rooms.find(r => r.label && r.polygon?.length > 2) || rooms[0]).id);
+  return sec;
+}
+
+// ------------------------------------------------------------------ Drone
+function renderDrone(b) {
+  const s = b.site;
+  const sec = h('section', { id: 'drone' }, h('h2', {}, 'Drone photos and aerial splat'));
+  if (!s?.available) { sec.append(h('p', { class: 'muted' }, 'This model has no drone flight or splat (232 of 14,945 models do).')); return sec; }
+  const ts = x => x ? `${x.slice(0, 4)}-${x.slice(4, 6)}-${x.slice(6, 8)} ${x.slice(8, 10)}:${x.slice(10, 12)}:${x.slice(12, 14)}` : '–';
+  sec.append(h('div', { class: 'tiles' },
+    tile('Drone photos', fmt(s.drone_photo_count, 0)), tile('Splat size', fmt(s.splatBytes / 1e6, 0) + ' MB', 'Gaussian splat (.ply)'),
+    tile('All files', fmt(s.totalBytes / 1e9, 1) + ' GB'), tile('Flight', ts(s.drone_flight_start).slice(0, 10), `${ts(s.drone_flight_start).slice(11, 16)}–${ts(s.drone_flight_end).slice(11, 16)} (drone clock)`)));
+  sec.append(h('p', { class: 'small muted' }, 'The drone photos carry their own timestamps and GPS, so their shadows have a known sun position. That is a second, independent check for the 232 drone-flown models, though it is a different moment from the Vexcel photo.'),
+    rawJson('Raw catalog (without the photo list)', s));
+  return sec;
+}
+
+// ------------------------------------------------------------------ Vexcel
+function renderVexcel(b, base) {
+  const v = b.vexcel; if (!v) return h('section', { id: 'vexcel' }, h('h2', {}, 'Vexcel'), h('p', { class: 'err' }, 'Not fetched.'));
+  return h('section', { id: 'vexcel' }, h('h2', {}, 'Vexcel aerial imagery'),
+    h('div', { class: 'grid2' },
+      h('img', { src: base + 'ortho.jpg', alt: 'Vexcel ortho', style: 'width:100%;border-radius:10px;border:1px solid var(--line)' }),
+      h('div', {}, kv([['Endpoint', h('code', {}, 'POST /v2/ortho/extract')], ['Layers', v.layer], ['Clip', `${v.box.half_m * 2} m square around the model`],
+        ['Pixels', `${v.box.size_px} × ${v.box.size_px} (${v.box.m_per_px.toFixed(3)} m per pixel)`], ['Bounds', `${v.box.s.toFixed(5)}–${v.box.n.toFixed(5)} N, ${v.box.w.toFixed(5)}–${v.box.e.toFixed(5)} E`],
+        ['Download', `${fmt(v.bytes / 1e6, 1)} MB in ${v.seconds} s`], ['Capture time', 'not returned']]),
+        h('div', { class: 'callout' }, h('p', {}, v.note + ' The shadow section recovers the sun angle from the image instead.')))));
+}
+
+// ------------------------------------------------------------------ CoStar
+function renderCostar(b) {
+  const cs = b.costar, L = cs.listing, F = cs.features, P = L?.property;
+  const sec = h('section', { id: 'costar' }, h('h2', {}, 'CoStar records'), h('p', { class: 'sub' }, 'From the local hackathon kit, joined on the Matterport model id.'));
+  if (L) {
+    sec.append(h('div', { class: 'tiles' },
+      tile('List price', money(L.currentPrice), L.originalPrice !== L.currentPrice ? 'was ' + money(L.originalPrice) : 'original price'),
+      tile('Listed', date(L.listDate), `${L.dom} days on market`), tile('Home', `${fmt(P.sqftMax, 0)} sq ft`, `${P.bedsMax} bed · ${P.bathsMax} bath`),
+      tile('Lot', `${fmt(P.lotSizeAcresMax, 3)} acres`, F?.derivedValues?.lotSizeInAcres ? '' : ''), tile('Built', P.yearBuilt, `${P.stories} story · ${P.totalParkingSpaces} parking`)));
+    const a = P.address || {};
+    sec.append(h('div', { class: 'grid2' },
+      kv([['Listing id', h('code', {}, L.id)], ['Residential listing id', h('code', {}, L.residentialListingId)], ['Property id', h('code', {}, L.propertyId)],
+        ['Address', a.fullStreetAddress ? `${a.fullStreetAddress}, ${a.city}, ${a.state} ${a.zip}` : cs.match?.address], ['Lat / lon', a.latitude ? `${a.latitude}, ${a.longitude}` : '–'],
+        ['MLS type', P.mlsPropertyType], ['Has 3D tour', L.has3DTour ? 'yes' : 'no'], ['Fireplace / hardwood', `${L.resoValues?.hasFireplace ? 'yes' : 'no'} / ${L.resoValues?.hasHardwoodFloors ? 'yes' : 'no'}`],
+        ['Architectural style', L.resoValues?.structure?.architecturalStyle || '–']]),
+      h('div', {}, h('div', { class: 'muted small' }, 'Remarks'), h('p', { class: 'small' }, L.remarks || '–'))));
+    if (F) {
+      sec.append(h('h3', {}, 'Highlights'), h('div', { class: 'tags' }, (F.highlights || []).map(x => h('span', { class: 'tag' }, x.text))));
+      sec.append(h('h3', {}, 'Features'), h('div', { class: 'grid2' }, (F.sections || []).map(s => h('div', {}, h('div', { class: 'small', style: 'font-weight:600' }, `${s.category} · ${s.subcategory}`), h('div', { class: 'small muted' }, s.lines.join(' · '))))));
+    }
+    const photos = (L.media || []).filter(m => /imagescdn|\.jpe?g/i.test(m.uri) && !/matterport/.test(m.uri));
+    if (photos.length) sec.append(h('h3', {}, `Listing photos (${photos.length})`), h('div', { class: 'photos' }, photos.slice(0, 24).map(m => h('img', { src: m.uri, loading: 'lazy', alt: 'Listing photo', referrerpolicy: 'no-referrer', onerror: e => e.target.remove() }))));
+    if (L.history?.length) sec.append(h('h3', {}, 'Listing history'), h('div', { class: 'tablebox' }, h('table', {},
+      h('thead', {}, h('tr', {}, h('th', {}, 'Date'), h('th', {}, 'Update type'), h('th', {}, 'Old'), h('th', {}, 'New'), h('th', { class: 'num' }, 'Price'))),
+      h('tbody', {}, L.history.map(x => h('tr', {}, h('td', {}, date(x.date)), h('td', {}, x.updateType), h('td', {}, x.oldValueString ?? '–'), h('td', {}, x.newValueString ?? '–'), h('td', { class: 'num' }, money(x.currentPrice))))))));
+  }
+  if (cs.property) sec.append(renderCommercial(cs.property), rawJson('Raw commercial property record', cs.property));
+  if (cs.nearby) sec.append(h('h3', {}, 'CoStar commercial properties in the aerial clip'),
+    h('div', { class: 'tablebox' }, h('table', {}, h('thead', {}, h('tr', {}, h('th', {}, 'Name'), h('th', {}, 'Address'), h('th', { class: 'num' }, 'Distance'), h('th', { class: 'num' }, 'Stories'), h('th', { class: 'num' }, 'Height ft'), h('th', { class: 'num' }, 'Year'), h('th', { class: 'num' }, 'RBA sq ft'))),
+      h('tbody', {}, cs.nearby.map(c => h('tr', {}, h('td', {}, c.name || '–'), h('td', {}, c.address), h('td', { class: 'num' }, c.distance_m + ' m'), h('td', { class: 'num' }, c.stories ?? '–'), h('td', { class: 'num' }, c.height_ft ?? '–'), h('td', { class: 'num' }, c.year_built ?? '–'), h('td', { class: 'num' }, fmt(c.rba_sf, 0))))))),
+    h('p', { class: 'small muted' }, 'Story counts are what calibrate the shadows. 3,327 of the kit’s 3,339 commercial properties have stories or a height.'));
+  if (L) sec.append(rawJson('Raw residential listing', L));
+  if (F) sec.append(rawJson('Raw listing features', F));
+  return sec;
+}
+
+function renderCommercial(C) {
+  const a = C.primaryAddress || {}, yr = (C.constructionEvents || []).find(e => e.year)?.year;
+  const reno = (C.constructionEvents || []).filter(e => e.year && e.year !== yr).map(e => `${enumName('ConstructionEventType', e.eventType) || 'event'} ${e.year}`);
+  const note = (C.notes || []).map(n => n.value).filter(Boolean);
+  const photos = (C.attachments || []).filter(x => x.attachmentUri && /\.(jpe?g|png)/i.test(x.attachmentUri));
+  const lot = C.lotSize != null ? `${fmt(C.lotSize, 2)} ${C.lotSizeMeasurementType === 2 ? 'acres' : C.lotSizeMeasurementType === 1 ? 'sq ft' : ''}` : '–';
+  const wrap = h('div', {});
+  wrap.append(h('h3', {}, C.buildingName || 'Commercial property'),
+    h('div', { class: 'tiles' },
+      tile('Type', enumName('PropertyType', C.propertyType) || '–', C.buildingClass ? `Class ${enumName('BuildingClass', C.buildingClass)}` : ''),
+      tile('Stories', C.numStoriesAboveGrade ?? '–', (C.floors || []).length ? `${C.floors.length} floor records` : ''),
+      tile('Rentable area', C.rentableBuildingAreaSquareFeet ? `${fmt(C.rentableBuildingAreaSquareFeet, 0)} sq ft` : '–', C.grossTypicalFloorSquareFeet ? `typical floor ${fmt(C.grossTypicalFloorSquareFeet, 0)} sq ft` : ''),
+      tile('Built', yr ?? '–', reno.join(' · ')),
+      tile('Lot', lot, C.parkingRatio ? `parking ${fmt(C.parkingRatio, 1)} / 1,000 sq ft` : '')),
+    h('div', { class: 'grid2' },
+      kv([['Property id', h('code', {}, C.id)], ['Address', [a.streetNumber, a.streetName, a.streetType].filter(Boolean).join(' ') + (a.city ? `, ${a.city}, ${a.state} ${a.postcode?.slice(0, 5) || ''}` : '')],
+        ['Lat / lon', a.latitude ? `${a.latitude}, ${a.longitude}` : '–'], ['Status', enumName('ConstructionStatus', C.constructionStatus)],
+        ['Construction', enumName('BuildingConstructionMaterialType', C.buildingConstructionMaterial)], ['Sprinklers', C.hasSprinklers == null ? '–' : C.hasSprinklers ? 'yes' : 'no'],
+        ['Zoning', C.zoningDescription], ['Parcels', (C.parcelNumbers || []).join(', ') || '–'],
+        ['Gross building area', C.grossBuildingAreaSquareFeet ? `${fmt(C.grossBuildingAreaSquareFeet, 0)} sq ft` : '–']]),
+      h('div', {}, h('div', { class: 'muted small' }, 'Notes'), note.length ? note.map(t => h('p', { class: 'small' }, t)) : h('p', { class: 'small' }, '–'))));
+  if ((C.floors || []).length) wrap.append(h('h3', {}, 'Floors'), h('div', { class: 'tablebox', style: 'max-height:260px' }, h('table', {},
+    h('thead', {}, h('tr', {}, h('th', {}, 'Floor'), h('th', { class: 'num' }, 'Size sq ft'))),
+    h('tbody', {}, C.floors.map(f => h('tr', {}, h('td', {}, enumName('FloorName', f.floorName) || f.floorName), h('td', { class: 'num' }, fmt(f.floorSize?.squareFeet, 0))))))));
+  if (photos.length) wrap.append(h('h3', {}, `Building photos (${photos.length})`), h('div', { class: 'photos' }, photos.slice(0, 24).map(x => h('img', { src: x.attachmentUri, loading: 'lazy', alt: x.caption || 'Building photo', title: x.caption || '', referrerpolicy: 'no-referrer', onerror: e => e.target.remove() }))));
+  return wrap;
+}
+
+// ------------------------------------------------------------------ Outlines table
+function renderOutlines(b, s) {
+  const rows = s.buildings.slice();
+  let key = 'distance_m', dir = 1;
+  const tbody = h('tbody');
+  const cols = [['osm_id', 'OSM way'], ['distance_m', 'Distance', 1], ['area_m2', 'Footprint m²', 1], ['status', 'Status'], ['shadow_m', 'Shadow m', 1], ['est_h', 'Estimate m', 1], ['lacounty_h', 'LA County m', 1], ['err', 'Error m', 1], ['start_date', 'Built']];
+  rows.forEach(r => r.err = r.est_h != null && r.lacounty_h != null && r.status === 'ok' ? +(r.est_h - r.lacounty_h).toFixed(1) : null);
+  function fill() {
+    rows.sort((a, c) => { const x = a[key], y = c[key]; if (x == null) return 1; if (y == null) return -1; return (x > y ? 1 : x < y ? -1 : 0) * dir; });
+    tbody.replaceChildren(...rows.map(r => h('tr', { 'data-id': r.osm_id, style: 'cursor:pointer', onclick: () => STATE.selectBuilding?.(r.osm_id, 'table') },
+      ...cols.map(([k, , num]) => h('td', { class: num ? 'num' : '' }, k === 'status' && r.reference ? 'reference' : k === 'osm_id' && r.osm_id === s.target_osm_id ? r.osm_id + ' (house)' : r[k] ?? '–')))));
+  }
+  const thead = h('thead', {}, h('tr', {}, cols.map(([k, n, num]) => h('th', { class: 'sortable ' + (num ? 'num' : ''), onclick: () => { dir = key === k ? -dir : 1; key = k; fill(); } }, n))));
+  fill();
+  return h('section', { id: 'osm' }, h('h2', {}, 'Building outlines and heights'),
+    h('p', { class: 'sub' }, `${b.osm.buildings} OpenStreetMap outlines in the clip, ${b.osm.with_height} with LA County measured heights. Click a column to sort, a row to show it on the map.`),
+    h('div', { class: 'tablebox' }, h('table', { id: 'bldTable' }, thead, tbody)));
+}
+
+main().catch(e => { console.error(e); $('#app').replaceChildren(h('p', { class: 'err' }, 'Failed to load: ' + e.message)); });
+</script>
+</body>
+</html>

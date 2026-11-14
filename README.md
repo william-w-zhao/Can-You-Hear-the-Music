@@ -1,109 +1,225 @@
 # Can You Hear the Music
 
-HackPrinceton 2026, CoStar track. Two local apps built on the same Matterport + Vexcel + CoStar data.
+HackPrinceton 2026, CoStar track. Pick any scanned building, pick a room, and hear how it sounds: echo time,
+a voice played in that room, and "what if" changes (carpet, acoustic panels, an exposed ceiling). An AI agent
+answers questions like "find the best room for client calls in this building".
+
+## Structure
+
+The app is a **backend** (Python, FastAPI) and a **frontend** (React + Vite). The existing data sources and
+acoustics pipeline live in the backend. The working demo pages live in `frontend/prototypes/` while the FastAPI
+routes and React UI are being built.
 
 ```
 Can You Hear the Music/
-├── acoustics/              Room acoustics app        → http://localhost:8766
-├── explorer/               Building explorer app     → http://localhost:8765
-├── shared/                 Code both apps use: keys, Matterport API, fetch_building.py
-├── data/<sid>/             Shared cache, one folder per Matterport model (both apps read and write it)
-├── key-check/              One-off API/SDK key tests; holds .env with the keys
-└── costar-hackathon-kit/   CoStar's data kit (read-only, hackathon use only)
+├── backend/                      Python, FastAPI                         → http://localhost:8000
+│   ├── app/
+│   │   ├── main.py               the FastAPI server
+│   │   ├── api/                  buildings · rooms · acoustics · jobs · agent (live stream)
+│   │   ├── sources/              configuration · Matterport · Vexcel · OpenStreetMap · CoStar kit
+│   │   ├── pipeline/             fetch_building · pointcloud · rooms (point-cloud split) ·
+│   │   │                         materials (Claude vision) · acoustics (Eyring engine) · shadows (parked)
+│   │   └── agent/                deepagents: main agent, sub-agents, tools wrapping pipeline/
+│   ├── prototypes/               local servers for the explorer and acoustics demos
+│   ├── tests/
+│   └── requirements.txt
+├── frontend/                     React + Vite                            → http://localhost:5173
+│   ├── src/
+│   │   ├── pages/                BuildingPicker → BuildingView (rooms on plan) → RoomView (echo, listen, what-if)
+│   │   ├── components/           FloorPlan · EchoChart · Listen (Web Audio) · WhatIf · AgentPanel
+│   │   └── api.ts                the only React module that calls the backend
+│   ├── public/audio/             dry voice clip for listening
+│   └── prototypes/               working explorer and acoustics demo pages
+├── data/                         shared cache, one folder per scanned model (git-ignored)
+├── key-check/                    API/SDK key tests; holds .env with the keys (git-ignored)
+└── costar-hackathon-kit/         CoStar's data kit (read-only, git-ignored)
 ```
+
+### How a request will flow
+
+1. **Pick a building.** `GET /api/buildings` lists scanned buildings from the kit and marks which scans have analysis ready.
+   Exclude outdoor-only scans such as pools and courtyards.
+2. **Pick a room.** `GET /api/buildings/{sid}/rooms` returns the room outlines. If the building hasn't been
+   analysed yet, `POST /api/buildings/{sid}/analyse` runs download → point cloud → room split → materials →
+   acoustics as a background job, with progress streamed to the page.
+3. **Hear the room.** `GET /api/buildings/{sid}/rooms/{room_id}/acoustics` returns echo times, materials and impulse-response settings.
+   The browser plays the voice with Web Audio, using the echo times returned by the backend. The what-if endpoint recomputes those times after a material change.
+
+### Where deepagents fits
+
+| deepagents feature | What it does here                                                                                                                                                                                              |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Main agent         | The acoustic investigator: "find the best room for client calls", "cheapest fix for the break room?"                                                                                                           |
+| Sub-agents         | `room-surveyor` (pipeline/rooms), `material-annotator` (pipeline/materials), `acoustic-simulator` (pipeline/acoustics), `context-scout` (CoStar: year built, tenants), `traffic-analyst` (street-noise estimates) |
+| Planning           | The agent's to-do list streams live to `AgentPanel`                                                                                                                                                            |
+| Working files      | Written to `data/<sid>/agent/`, the same files the UI reads                                                                                                                                                    |
+| Human approval     | A low-confidence material ("glass or glossy paint?") pauses the agent; the frontend shows the image and a person confirms                                                                                      |
+
+Rule: **the agent decides, the code computes.** Every number the agent states comes from a pipeline function.
 
 ## Run
 
-From this folder, one terminal per app:
+Target app (skeleton: routes answer 501 until they are ported):
 
 ```bash
-python3 explorer/serve.py
+cd backend && python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt && uvicorn app.main:app --reload --port 8000
 ```
 
 ```bash
-python3 acoustics/serve.py
+cd frontend && npm install && npm run dev
 ```
 
-Or start either from the app's Browser pane, using the `explorer` and `acoustics` configurations in
-`.claude/launch.json`.
-
-## Add a building
+Working prototypes (one terminal each, using the Python dependencies from the backend setup above):
 
 ```bash
-python3 shared/fetch_building.py --model <sid>     # or the "Download" button in the explorer
+cd backend && source .venv/bin/activate && python3 -m prototypes.explorer  # http://localhost:8765
 ```
 
-Then see `explorer/README.md` (shadow heights, rooms) and `acoustics/README.md` (echo times).
+```bash
+cd backend && source .venv/bin/activate && python3 -m prototypes.acoustics  # http://localhost:8766
+```
 
-## Next steps
+## Build plan
 
-Where things stand: the acoustics prototype works on two buildings (an office suite split into 11 rooms from
-its point cloud, and a 1920 house from Matterport's room outlines). Each room has an echo time, a playable
-voice clip and "what if" material changes. Materials were labelled by hand and nothing is checked against real
-measurements yet. The sunlight / shadow-height work is parked in the explorer.
+Start with the cached office suite (`hLR2zAFV1tK`, 11 rooms), then check the same flow on the 1920 house
+(`zvKHR9DHNjJ`, 13 rooms). The prototypes already split rooms, estimate echo from hand-labeled materials and
+play a voice with Web Audio. The FastAPI feature routes and React views are still scaffolds. The first milestone
+is a dashboard that can compare two office rooms and play a material what-if using cached data.
+The [Hear the Space build guide](https://claude.ai/artifact/Vie6TwPdwnQxj7zGCiYq1C) describes the full demo,
+including the hourly street-noise slider and the agent.
 
-In priority order. Each step says what "done" looks like.
+### Component responsibilities
 
-### 1. Prove the numbers: clap test at the venue (most important)
-Judges will ask "how do you know?". Right now the answer is "we don't".
-- Write `acoustics/measure_rt60.py`: takes a phone recording of a clap or balloon pop, returns the measured
-  echo time at low, mid and high pitch.
-- Pick 3–4 rooms at the venue that sound different (small office, classroom, stairwell, hallway). Tape-measure
-  them, note the materials, record a clap in each.
-- Put each room through `acoustics.py` and compare predicted vs measured.
-- Ask the Matterport engineers whether the hackathon keys can see a space we scan ourselves with the phone app;
-  if so, scan one venue room and test the whole pipeline end to end.
-- **Done when:** a table of predicted vs measured echo time for 3+ real rooms, with the error, is on the page.
-  If the error is large, adjust the furniture and material values in `acoustics.py` (furnished rooms are
-  probably estimated too echoey today).
+| Component | Code and inputs | Output or consumer |
+|---|---|---|
+| Building data | `backend/app/sources/` and `app/pipeline/fetch_building.py` read the CoStar kit, Matterport and aerial imagery | Catalog and `data/<sid>/bundle.json` with scan metadata, panoramas and floor-plan files |
+| Room geometry | `app/pipeline/pointcloud.py` and `rooms.py` use Matterport outlines or split a point cloud | `rooms.json` with floor-plan pixels, room dimensions and panorama IDs |
+| Material annotation | `app/pipeline/materials.py` will use YOLO to locate furniture and Claude vision to classify acoustic surfaces | `materials.json` keyed by room ID, with editable labels, confidence and image references |
+| Acoustic engine | `app/pipeline/acoustics.py` combines geometry and materials | Three-band RT60, a mid-band range and treatment results for API and agent tools |
+| Street noise | Add traffic data ingestion under `app/sources/` and indoor estimates under `app/pipeline/` | A sourced 24-hour estimate per room for the chart, audio mixer and agent |
+| API and jobs | `backend/app/api/` reads cached outputs, validates changes and streams work in progress | Typed responses and server-sent events for `frontend/src/api.ts` |
+| Dashboard | `frontend/src/pages/` and `components/` render the floor plan, room cards and controls | Building selection, A/B listening, what-ifs and an agent activity panel |
+| Agent | `backend/app/agent/` wraps the pipeline in deepagents tools | Ranked room recommendations, a live task trace and material review requests |
 
-### 2. Automate material labelling
-- Write `acoustics/label_materials.py`: one Claude API call per room with that room's panorama faces, returning
-  floor, ceiling, walls, furnishing, glass area and a confidence, in the same shape as `materials.json`.
-- Low-confidence answers get flagged for a person to confirm.
-- Needs `ANTHROPIC_API_KEY` in `.env`.
-- **Done when:** it reproduces the hand labels for both buildings, then runs on a new building with no hand work.
+### 1. Serve the cached buildings through FastAPI
 
-### 3. Run it on more buildings, and pick the demo set
-- Run the pipeline on 10–20 scans. Look for contrast: an exposed-ceiling "creative office", a loft, a large
-  apartment, a small studio, a restaurant or retail space.
-- Fix what breaks. Known issues: room outlines can spill outdoors through windows (bottom right of the Bundy Dr
-  plan), window glass is not detected from the point cloud, and multi-floor scans are untested.
-- **Done when:** 5 demo buildings with clearly different results, all cached in `data/`.
+1. Implement the building list and detail handlers in `backend/app/api/buildings.py`. Reuse the CoStar
+   catalog loader and include analysis availability so the picker can distinguish cached scans from the rest.
+2. Implement the room list from `rooms.json`. Return the floor-plan image URL and dimensions together with
+   room IDs, polygons and room labels, so the frontend can overlay the polygons at any display size.
+3. Define the room acoustics contract before wiring React. Both demo buildings have an `r1`, so use the
+   scan ID and the room ID together. These are target routes for this milestone.
 
-### 4. One button from the explorer
-- Add an "Analyse acoustics" button in the explorer next to the existing Download button. It runs
-  `pointcloud.py`, `rooms_from_cloud.py`, `label_materials.py` and `acoustics.py`, then opens the acoustics app.
-- **Done when:** any downloaded building can be analysed from the browser without a terminal.
+   | Route | Response |
+   |---|---|
+   | `GET /api/buildings` | Catalog summaries and analysis availability |
+   | `GET /api/buildings/{sid}` | Scan metadata and analysis status |
+   | `GET /api/buildings/{sid}/rooms` | Floor-plan metadata and room outlines |
+   | `GET /api/buildings/{sid}/rooms/{room_id}/acoustics` | Materials, echo times at 125 Hz, 500 Hz and 2 kHz, the 500 Hz range and the verdict |
+   | `POST /api/buildings/{sid}/rooms/{room_id}/acoustics/what-if` | Recomputed echo times and verdict after a validated material or furnishing override |
 
-### 5. Street noise (stretch)
-- Outdoor level at the building from the US DOT national transportation noise map (road and aviation).
-- Indoor estimate per room facing the street, as a range by window type (year built from CoStar suggests single
-  or double pane), with an "open window" toggle.
-- **Done when:** each room shows indoor street noise as a range, with the source named. Keep claims rough;
-  this is the least certain part.
+4. Reuse `rt60()` from `pipeline/acoustics.py` for what-ifs. Combine each override with the saved room
+   labels in memory and return the result without modifying the cache. Return a clear error for unknown rooms,
+   missing analysis or invalid material choices. Update `frontend/src/api.ts` to use the same paths and types.
 
-### 6. The agent (for the CoStar and LangChain prizes)
-- A deepagents agent that answers questions like "find the best room for client calls in this building" or
-  "what's the cheapest fix for the break room?", using steps 1–5 as tools.
-- It asks a person when a material label is low confidence, and every number it states comes from a tool.
-- **Done when:** the agent answers both example questions live, with its plan visible on screen.
+**Done when** both scans return real responses in `/docs`, the two `r1` lookups resolve to the correct rooms,
+and `backend/tests/test_acoustics.py` reproduces the saved echo results for all 24 rooms.
 
-### 7. Demo and submission
-- Two-minute script: the problem, pick a building, hear two rooms, try the exposed-ceiling what-if, show the
-  validation table, the agent answers a question.
-- Speak in comparisons and categories ("this room is twice as echoey", "good for calls"), not exact decibels.
-- Bring headphones for the judges and record a backup video.
-- Devpost: CoStar track, main track, LangChain deepagents.
+### 2. Build the React listening flow
 
-### Housekeeping
-- `git init` and push only after checking `git status` shows no data or keys (the `.gitignore` covers them).
-- Add a `requirements.txt` (`requests numpy scipy pillow scikit-image`).
-- Share keys with teammates through a private channel, never in the repo; each person fills in
-  `key-check/.env` from `key-check/.env.example`.
+1. **BuildingPicker** loads the catalog through `api.ts`, shows which scans can be played and links to
+   `/b/:sid`. Start with the two cached scans and make them easy to find.
+2. **BuildingView and FloorPlan** overlay each room polygon on the cached plan. Make rooms selectable from
+   both the plan and a room list. Link the selection to `/b/:sid/r/:rid`.
+3. **RoomView and EchoChart** display the current materials, room verdict and RT60 at the three bands.
+   Handle loading, errors and scans awaiting analysis.
+4. **Listen** ports the browser impulse-response and playback code from
+   `frontend/prototypes/acoustics/index.html`. Load the dry voice clip from `frontend/public/audio/`.
+   Start playback on user action and let the listener replay the same clip in two rooms at the same gain.
+5. **WhatIf** sends a material change through `api.ts` and feeds the returned RT60 values to the chart and
+   player. Keep the baseline available for A/B playback. Start with the existing exposed-ceiling and flooring
+   changes, then add any treatments the engine supports.
+
+**Done when** a user can pick either cached building, select a room, hear a comparison and reset a what-if.
+Keep the prototypes available until the React dashboard covers the demo flow.
+
+### 3. Add hourly street noise for one building
+
+1. Pick a demo scan near a road with usable traffic counts. Cache the count, road segment, source and date.
+   Prefer local or state agency counts. Record when a typical hourly profile is used to fill gaps in daily data.
+2. Estimate the road-to-window distance and which rooms face the road. Record the assumed glazing and its
+   attenuation. Use the road data and these assumptions to calculate a 24-hour indoor estimate with a confidence
+   note. If exploring Vexcel car detections, use them as a lower-confidence fallback.
+3. Serve the curve for that scan and add the time slider and traffic mix in `Listen`. Keep street noise and
+   RT60 as separate inputs to playback, since the time slider changes the background sound.
+
+**Done when** the dashboard shows the source and assumptions behind the estimate and a listener can hear the
+difference between 2 a.m. and 8 a.m. The traffic-data work can begin alongside the dashboard.
+
+### 4. Automate material labels and analyse a new scan
+
+1. In `pipeline/materials.py`, use the room's panorama IDs to fetch the six skybox faces of a representative
+   panorama. Run [YOLO detection](https://docs.ultralytics.com/modes/predict) on each face to locate common
+   furniture such as chairs and couches. Keep each detection's label, confidence, bounding box, panorama ID
+   and face index so the agent can retrieve the crop later. Use detections to inform the room's coarse
+   furnishing category.
+2. Send the faces and relevant detections in a structured Claude vision request using `ANTHROPIC_API_KEY`.
+   Classify acoustically important surfaces such as carpet, ceiling tile, acoustic panels and glazing. Return
+   floor, ceiling, walls and furnishing labels using the engine's existing keys, with confidence and evidence
+   references. Estimate glass area from room geometry where possible and record any assumptions.
+3. Compare predictions with the hand labels in both demo buildings. Flag low-confidence or missing labels
+   that could change the acoustic result, and preserve confirmed corrections on retry.
+4. Implement `POST /api/buildings/{sid}/analyse` and the job endpoints in `api/jobs.py`. Run download,
+   geometry, material labels and acoustics in that order. Use Matterport outlines where suitable and point-cloud
+   segmentation as the other path. Stream stage changes and failures to the dashboard and reuse completed
+   outputs on retry.
+5. Run the flow on a previously uncached scan. Check the room polygons against the floor plan, especially near
+   windows. Verify floor selection before using a multi-floor scan in the demo.
+
+**Done when** a user can start analysis from the picker, see progress, review doubtful labels and play a room
+when the job finishes.
+
+### 5. Add the deepagents workflow
+
+1. In `app/agent/tools.py`, expose room lookup, acoustic comparison, what-if and CoStar context as tools.
+   Start with cached results so the first agent question can complete without running a full analysis job.
+2. In `app/agent/`, give the main agent the building context and delegate to specialists for geometry,
+   materials, acoustics, CoStar context and traffic as those tools become available. Save tool evidence under
+   `data/<sid>/agent/` so a recommendation can point to the room and calculated values it used.
+3. Give the material annotator tools to fetch a detection crop, inspect a second panorama and ask Claude
+   vision to classify the surface using the engine's material choices. Investigate when views disagree or when
+   an uncertain label could change the room ranking. If both labels remain plausible, use the what-if tool to
+   see how much the choice affects RT60.
+4. Wire `api/agent.py` and `AgentPanel` for chat, streamed to-dos, tool activity and final answers. If a
+   consequential label stays ambiguous, show both views and the proposed labels. Use a
+   [Deep Agents review interrupt with a checkpointer](https://docs.langchain.com/oss/python/deepagents/human-in-the-loop)
+   to pause and resume after the user confirms or corrects the label. Save the reviewed label in
+   `materials.json`, recompute RT60 and refresh the room ranking and playback.
+
+**Done when** the agent can rank rooms for client calls, compare a treatment with the baseline, and show the
+tool results behind its recommendation. If it recommends the cheapest treatment, give it explicit cost inputs.
+
+### 6. Validate, rehearse and submit
+
+1. Record repeated claps or balloon pops in 3–4 contrasting venue rooms. Measure room dimensions and label
+   surfaces, estimate decay from the recordings and show predicted versus measured echo times. Ask the
+   Matterport engineers whether a phone scan of a venue room can be accessed with the hackathon keys.
+2. Expand the cached demo set toward five contrasting scans. Keep the office and house available and include
+   a near-road example with defensible traffic data. Freeze features once the demo flow is stable and
+   rehearse with cached analysis outputs and headphones.
+3. Rehearse the two-minute flow from the build guide. Ask for the best call room and use a real ambiguity,
+   such as glass versus a glossy partition, to show the agent checking a second view and comparing both RT60
+   estimates. Compare two rooms by ear, show the time slider and play a treatment before and after. Record a
+   backup video before submission.
+4. Prepare the Devpost submission for the CoStar, main and LangChain deepagents tracks. Review `git status`
+   before pushing. Keep `data/`, the CoStar kit and real `.env`
+   files out of Git. Each teammate can populate `key-check/.env` from `key-check/.env.example` using keys
+   shared privately.
 
 ## Rules for adding code
 
-- Code used by both apps goes in `shared/`; each app imports it with the two-line `sys.path` bootstrap at the top of its scripts.
-- Downloaded or computed data goes in `data/<sid>/`, never inside an app folder.
-- Keys stay in `.env` (here or in `key-check/`), never in code or HTML; `.env` and `data/` are git-ignored.
+- Backend: routes in `api/` stay thin; computation goes in `pipeline/`; anything that talks to an outside
+  service or reads the kit goes in `sources/`. The agent only calls `pipeline/` and `sources/` functions.
+- Frontend: only `src/api.ts` calls the backend.
+- Downloaded or computed data goes in `data/<sid>/`, never in a code folder.
+- Keys stay in `.env`, never in code or HTML; `.env`, `data/` and the CoStar kit are git-ignored.

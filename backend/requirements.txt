@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+requests
+numpy
+scipy
+pillow
+scikit-image
+anthropic
+deepagents
+langchain-anthropic

@@ -12,8 +12,6 @@ costar-hackathon-kit/
 data/
 # Images saved by the key check
 key-check/out/
-# Generated audio
-acoustics/audio/
 # Any stray data files, wherever they end up
 *.jsonl
 *.csv
@@ -23,7 +21,13 @@ acoustics/audio/
 *.zip
 *.dxf
 
+# Generated audio for the listening demo
+frontend/public/audio/*.wav
+
 # ---- Build and OS clutter ----
 __pycache__/
 *.pyc
+.venv/
+node_modules/
+frontend/dist/
 .DS_Store
