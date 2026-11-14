@@ -1,7 +1,142 @@
-// One room: echo time chart, listen (voice / clap), what-if materials, panorama.
-// TODO: port the room card from frontend/prototypes/acoustics/index.html.
-import { useParams } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { api, type RoomAcoustics } from "../api";
+import { useData } from "../useData";
+import LoadState from "../components/LoadState";
+import EchoChart from "../components/EchoChart";
+import Listen from "../components/Listen";
+import WhatIf from "../components/WhatIf";
+import RoomComparison from "../components/RoomComparison";
+import "../room.css";
+
 export default function RoomView() {
-  const { sid, rid } = useParams();
-  return <main><h1>Room {rid} in {sid}</h1><p>TODO: EchoChart, Listen, WhatIf</p></main>;
+  const { sid = "", rid = "" } = useParams();
+  return <RoomWorkspace key={`${sid}/${rid}`} sid={sid} rid={rid} />;
+}
+
+function RoomWorkspace({ sid, rid }: { sid: string; rid: string }) {
+  const { data, error, retry } = useData(`${sid}/${rid}`, async (signal) => {
+    const [details, plan] = await Promise.all([
+      api.acoustics(sid, rid, signal),
+      api.rooms(sid, signal),
+    ]);
+    return { details, plan };
+  });
+  const [scenario, setScenario] = useState<RoomAcoustics>();
+  const [compare, setCompare] = useState("");
+  const comparison = useData(`${sid}/${compare}`, (signal) =>
+    compare ? api.acoustics(sid, compare, signal) : Promise.resolve(null),
+  );
+  const choices = useMemo(
+    () =>
+      data
+        ? [
+            {
+              label: `As scanned / ${data.details.room.type}`,
+              room: data.details.room,
+            },
+            ...(scenario
+              ? [{ label: "Material what-if", room: scenario }]
+              : []),
+            ...(comparison.data
+              ? [
+                  {
+                    label: `Other room / ${comparison.data.room.type} (${compare})`,
+                    room: comparison.data.room,
+                  },
+                ]
+              : []),
+          ]
+        : [],
+    [data, scenario, comparison.data, compare],
+  );
+  const base = data?.details.room;
+  const geometry = data?.plan.rooms.find((room) => room.id === rid);
+  return (
+    <div className="room-page">
+      <header className="site-header">
+        <Link className="brand" to="/">
+          ≋ Hear the Space
+        </Link>
+        <span>ROOM ACOUSTICS / COMPARISON</span>
+      </header>
+      <main>
+        <Link className="back" to={`/b/${encodeURIComponent(sid)}`}>
+          ← Back to floor plan
+        </Link>
+        <div className="eyebrow">LISTEN / 03</div>
+        <h1>{base?.type || `Room ${rid}`}</h1>
+        {!data || !base ? (
+          <LoadState error={error} retry={retry} />
+        ) : (
+          <>
+            <div className="summary">
+              <div>
+                <span className="badge ready">{base.verdict}</span>
+                <p>
+                  {rid} / {sid}
+                </p>
+              </div>
+              <div className="metric">
+                <strong>
+                  {base.rt60[1].toFixed(2)}
+                  <small> s</small>
+                </strong>
+                <span>echo at 500 Hz</span>
+              </div>
+              {scenario && (
+                <div className="metric">
+                  <strong>
+                    {scenario.rt60[1].toFixed(2)}
+                    <small> s</small>
+                  </strong>
+                  <span>what-if · {scenario.verdict}</span>
+                </div>
+              )}
+            </div>
+            {geometry && (
+              <div className="dimensions">
+                <span>
+                  <b>{geometry.area_m2.toFixed(1)} m²</b> floor area
+                </span>
+                <span>
+                  <b>{geometry.height_m.toFixed(1)} m</b> ceiling height
+                </span>
+                <span>
+                  <b>{geometry.volume_m3.toFixed(1)} m³</b> room volume
+                </span>
+              </div>
+            )}
+            <RoomComparison
+              baseline={data.details}
+              other={comparison.data}
+              plan={data.plan}
+              rid={rid}
+              selected={compare}
+              onSelect={setCompare}
+              error={comparison.error}
+              retry={comparison.retry}
+            />
+            <Listen choices={choices} voiceUrl={data.details.voice_url} />
+            <div className="workspace">
+              <EchoChart
+                baseline={base}
+                scenario={scenario}
+                bands={data.details.bands_hz}
+              />
+              <WhatIf
+                sid={sid}
+                rid={rid}
+                details={data.details}
+                onResult={setScenario}
+              />
+            </div>
+          </>
+        )}
+      </main>
+      <footer>
+        CAN YOU HEAR THE MUSIC? <span>Acoustic estimates / CoStar track</span>
+      </footer>
+    </div>
+  );
 }

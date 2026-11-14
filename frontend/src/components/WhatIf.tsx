@@ -1,2 +1,152 @@
-// Material, contents and glass controls; calls api.whatIf() and shows before / after.
-export default function WhatIf() { return null; }
+import { useEffect, useRef, useState } from "react";
+import {
+  api,
+  type AcousticDetails,
+  type RoomAcoustics,
+  type RoomMaterials,
+} from "../api";
+
+export default function WhatIf({
+  sid,
+  rid,
+  details,
+  onResult,
+}: {
+  sid: string;
+  rid: string;
+  details: AcousticDetails;
+  onResult: (room?: RoomAcoustics) => void;
+}) {
+  const base = details.room;
+  const initial: RoomMaterials = {
+    floor: base.floor,
+    ceiling: base.ceiling,
+    walls: base.walls,
+    furnishing: base.furnishing,
+    glass_m2: base.glass_m2,
+  };
+  const [values, setValues] = useState(initial);
+  const [glass, setGlass] = useState(String(initial.glass_m2));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const pending = useRef<AbortController>();
+  useEffect(() => () => pending.current?.abort(), []);
+  const validGlass =
+    glass.trim() !== "" && Number.isFinite(Number(glass)) && Number(glass) >= 0;
+  return (
+    <section className="panel">
+      <div className="eyebrow">CHANGE THE SURFACE</div>
+      <h2>What if this room felt softer?</h2>
+      <p>Try a treatment. The original scan stays available for comparison.</p>
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (!validGlass || pending.current) return;
+          const controller = new AbortController();
+          pending.current = controller;
+          setBusy(true);
+          setError("");
+          setNotice("");
+          try {
+            const room = await api.whatIf(
+              sid,
+              rid,
+              { ...values, glass_m2: Number(glass) },
+              controller.signal,
+            );
+            if (!controller.signal.aborted) {
+              onResult(room);
+              setNotice(
+                "Comparison updated. Listen to the baseline and what-if below.",
+              );
+            }
+          } catch (e) {
+            if (!controller.signal.aborted)
+              setError(e instanceof Error ? e.message : String(e));
+          } finally {
+            pending.current = undefined;
+            if (!controller.signal.aborted) setBusy(false);
+          }
+        }}
+      >
+        <fieldset disabled={busy}>
+          <div className="form-grid">
+            {(["floor", "ceiling", "walls"] as const).map((field) => (
+              <label key={field}>
+                {field}
+                <select
+                  value={values[field]}
+                  onChange={(e) =>
+                    setValues({ ...values, [field]: e.target.value })
+                  }
+                >
+                  {Object.entries(details.material_options).map(
+                    ([key, label]) => (
+                      <option key={key} value={key}>
+                        {label}
+                      </option>
+                    ),
+                  )}
+                </select>
+              </label>
+            ))}
+            <label>
+              Furnishing
+              <select
+                value={values.furnishing}
+                onChange={(e) =>
+                  setValues({ ...values, furnishing: e.target.value })
+                }
+              >
+                {details.furnishing_options.map((key) => (
+                  <option key={key} value={key}>
+                    {key.replaceAll("_", " ")}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Glass area (m²)
+              <input
+                type="number"
+                required
+                min="0"
+                step="any"
+                value={glass}
+                onChange={(e) => setGlass(e.target.value)}
+                aria-invalid={!validGlass}
+              />
+            </label>
+          </div>
+          {!validGlass && <p role="alert">Enter a non-negative glass area.</p>}
+          <div className="actions">
+            <button disabled={!validGlass} type="submit">
+              {busy ? "Calculating..." : "Apply what-if"}
+            </button>
+            <button
+              className="secondary"
+              type="button"
+              onClick={() => {
+                setValues(initial);
+                setGlass(String(initial.glass_m2));
+                onResult(undefined);
+                setError("");
+                setNotice("Reset to the original scan.");
+              }}
+            >
+              Reset to baseline
+            </button>
+          </div>
+        </fieldset>
+      </form>
+      {busy && <p role="status">Recomputing echo times...</p>}
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+      {notice && <p role="status">{notice}</p>}
+    </section>
+  );
+}
