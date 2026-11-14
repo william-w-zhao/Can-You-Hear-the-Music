@@ -3,7 +3,9 @@ import json
 
 from app.pipeline.acoustics import CONTENTS, MATERIALS, analyse_acoustics
 from app.pipeline.cache_files import write_json
-from app.sources.config import DATA, secret
+from app.pipeline.vision import analyse_vision
+from app.sources.config import DATA
+from app.sources.review_model import resolve_review_model
 
 
 def analyse_building(sid, report):
@@ -11,9 +13,6 @@ def analyse_building(sid, report):
     directory = DATA / sid
     rooms_file = directory / "rooms.json"
     materials_file = directory / "materials.json"
-    if rooms_file.is_file() and (directory / "acoustics.json").is_file():
-        return None
-
     if not rooms_file.is_file():
         from app.pipeline.fetch_building import fetch_building
         from app.pipeline.pointcloud import download_pointcloud
@@ -45,21 +44,27 @@ def analyse_building(sid, report):
     geometry = json.loads(rooms_file.read_text())
     if not geometry["rooms"]:
         raise ValueError("No usable rooms were found in this scan.")
+    vision = analyse_vision(directory, geometry, report)
+    if (directory / "acoustics.json").is_file():
+        return None
     if not materials_file.is_file():
         from app.pipeline.materials import suggest_materials
 
-        key = secret("ANTHROPIC_API_KEY", required=False)
+        settings, _ = resolve_review_model()
         suggestions = {}
-        if key and (directory / "room_sheet.jpg").is_file():
-            suggestions = suggest_materials(directory, geometry["rooms"], report)
+        if settings and (directory / "room_sheet.jpg").is_file():
+            suggestions = suggest_materials(directory, geometry["rooms"], report, settings, vision["indoor"]["rooms"]
+                                            if vision["indoor"]["status"] == "complete" else {})
         if len(suggestions) != len(geometry["rooms"]) or any(
             item["confidence"] < 0.8 for item in suggestions.values()
         ):
-            return {"rooms": geometry["rooms"], "suggestions": suggestions,
+            object_hints = {room_id: {key: item[key] for key in ("objects", "candidates")}
+                            for room_id, item in vision["indoor"].get("rooms", {}).items()}
+            return {"rooms": geometry["rooms"], "suggestions": suggestions, "object_hints": object_hints,
                     "has_room_sheet": (directory / "room_sheet.jpg").is_file(),
                     "material_options": {key: value["name"] for key, value in MATERIALS.items()},
                     "furnishing_options": list(CONTENTS)}
-        write_json(materials_file, {"labelled_by": "Claude panorama analysis", "rooms": suggestions})
+        write_json(materials_file, {"labelled_by": f"{settings.identifier} panorama analysis", "rooms": suggestions})
 
     report("Calculating room echo times")
     analyse_acoustics(sid, directory)

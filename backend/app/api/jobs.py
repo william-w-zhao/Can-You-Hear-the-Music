@@ -49,7 +49,7 @@ def run_job(job_id, sid):
 def start_job(sid):
     with lock:
         job_id = latest.get(sid)
-        if job_id and jobs[job_id]["status"] != "failed":
+        if job_id and jobs[job_id]["status"] in ("running", "needs_materials"):
             return job_id
         job_id = uuid4().hex
         latest[sid] = job_id

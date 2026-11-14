@@ -56,8 +56,13 @@ def get_building(sid: str):
         name = bundle.get("matterport", {}).get("basics", {}).get("name")
         if name:
             summary["name"] = name
+    if (directory / "vision.json").is_file():
+        vision = read_scan_file(sid, "vision.json")
+        summary["vision_pending"] = any(vision[part]["status"] == "failed" for part in ("indoor", "aerial"))
+    else:
+        summary["vision_pending"] = True
     job = latest_job(sid)
-    if job:
+    if job and job["status"] in ("running", "needs_materials"):
         summary["analysis_job_id"] = job["job_id"]
     return summary
 
@@ -87,4 +92,18 @@ def list_rooms(sid: str):
             {**room, "label": labels.get(room["id"]) or room.get("matterport_label") or room["id"]}
             for room in geometry["rooms"]
         ],
+    }
+
+
+@router.get("/{sid}/surroundings")
+def get_surroundings(sid: str):
+    """Keep image detections and mapped footprints as separate evidence sources."""
+    directory = scan_directory(sid)
+    vision = (read_scan_file(sid, "vision.json")["aerial"]
+              if (directory / "vision.json").is_file() else {"status": "pending"})
+    osm_count = len(read_scan_file(sid, "osm.json")) if (directory / "osm.json").is_file() else None
+    return {
+        **vision,
+        "image_url": f"/data/{sid}/ortho.jpg" if (directory / "ortho.jpg").is_file() else None,
+        "mapped_buildings": osm_count,
     }

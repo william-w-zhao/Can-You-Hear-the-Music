@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """
-Building explorer + SDK key check on http://localhost:8765 (localhost only; the SDK key is allowed there).
+Building explorer on http://localhost:8765.
 
     /                     building explorer: pick any kit building, then any room
-    /keys                 Showcase SDK key check (key-check/sdk_test.html)
     /api/catalog          every model in the kit CSVs, with a short CoStar summary and a "cached" flag
     /api/kit/<sid>        that model's full CoStar records from the kit (no network)
     POST /api/fetch/<sid> run the building download in the background
@@ -13,7 +12,7 @@ Building explorer + SDK key check on http://localhost:8765 (localhost only; the 
     /data/...             the shared per-model cache in <project>/data/
     /acoustics            redirects to the acoustics app (http://localhost:8766)
 
-Reads MATTERPORT_SDK_KEY from <project>/.env or key-check/.env. Never serves .env or .py files.
+Reads MATTERPORT_SDK_KEY from the shell or <project>/.env.
 """
 import http.server
 import json
@@ -23,12 +22,11 @@ import sys
 import threading
 
 from app.sources import costar_kit as catalog
-from app.sources.config import BACKEND, DATA, FRONTEND, ROOT, secret
+from app.sources.config import BACKEND, DATA, FRONTEND, secret
 from app.sources.matterport import mp
 
 PAGE = FRONTEND / "prototypes" / "explorer"
 ACOUSTICS_URL = os.environ.get("ACOUSTICS_URL", "http://localhost:8766")
-KEYCHECK = ROOT / "key-check"
 PORT = int(os.environ.get("PORT", 8765))
 
 CATALOG, OFFSETS = catalog.load()
@@ -152,13 +150,6 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
-        if path in ("/keys", "/keys/"):
-            body = (KEYCHECK / "sdk_test.html").read_bytes()
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(body)
-            return
         if path in ("/acoustics", "/acoustics/", "/acoustics.html"):
             from urllib.parse import urlsplit
             q = urlsplit(self.path).query
@@ -173,6 +164,5 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     print(f"Explorer:  http://localhost:{PORT}  ({len(CATALOG):,} buildings in the catalog)\n"
-          f"SDK check: http://localhost:{PORT}/keys\n"
           f"Acoustics: {ACOUSTICS_URL}  (separate app: python3 -m prototypes.acoustics)\n(Ctrl+C to stop)")
     http.server.ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()

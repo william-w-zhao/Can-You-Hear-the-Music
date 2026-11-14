@@ -13,24 +13,20 @@ Split a scan into rooms from its point cloud, when Matterport's own room data is
     -> data/<sid>/rooms.json and data/<sid>/room_sheet.jpg (panorama faces per room, for material labelling)
 """
 import argparse
-import io
 import json
 
 import numpy as np
-import requests
 from PIL import Image, ImageDraw
 from scipy import ndimage
 from skimage import measure
 
 from app.pipeline.cache_files import write_json
+from app.pipeline.panoramas import download_face, face_path, save_face, skyboxes
+from app.pipeline.vision import FACE_ORDER, SHEET_MARGIN
 from app.sources.config import DATA
-from app.sources.matterport import mp
 
 RES = 0.05            # grid cell, metres
 DOOR_M = 1.3          # widest gap treated as a doorway
-
-Q_SKY = """query($id: ID!) { model(id: $id) { panoLocations { id skybox(resolution: "2k") { children } } } }"""
-
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -107,6 +103,7 @@ def rooms_from_cloud(d, bundle):
         cy, cx = ndimage.center_of_mass(m)
         rooms.append({
             "id": f"r{len(rooms) + 1}", "area_m2": round(area, 1), "height_m": round(height, 2),
+            "height_source": "point_cloud_estimate" if zs.size > 50 else "floor_point_cloud_estimate",
             "volume_m3": round(area * height, 1), "perimeter_m": round(perim, 1),
             "window_len_m": round(min(window_len, perim), 1), "panos": [p["id"] for p in ps],
             "pano_labels": [p["label"] for p in ps], "polygon_px": pts,
@@ -159,19 +156,21 @@ def finish(sid, d, rooms, fp, method, floor_z, ceil_z):
     print(f"{len(rooms)} rooms: " + ", ".join(f"{r['id']} {r.get('matterport_label', '')} {r['area_m2']} m² ({len(r['panos'])} panos)" for r in rooms))
 
     # Contact sheet: for each room, its first panorama's ceiling, floor and four walls, for material labelling.
-    sky = {p["id"]: (p.get("skybox") or {}).get("children") for p in mp(Q_SKY, id=sid)["model"]["panoLocations"]}
+    sky = skyboxes(sid)
     t = 200
-    sheet = Image.new("RGB", (t * 6 + 70, t * len(rooms)), "white")
+    sheet = Image.new("RGB", (t * len(FACE_ORDER) + SHEET_MARGIN, t * len(rooms)), "white")
     dr = ImageDraw.Draw(sheet)
     for i, r in enumerate(rooms):
-        faces = next((sky.get(pano) for pano in r["panos"] if len(sky.get(pano) or []) == 6), None)
-        r["panorama_available"] = bool(faces)
-        if not faces:
-            dr.text((75, i * t + t // 2), "Panorama unavailable", fill="black")
+        pano = next((pano for pano in r["panos"] if len(sky.get(pano) or []) == len(FACE_ORDER)), None)
+        r["panorama_available"] = bool(pano)
+        if not pano:
+            dr.text((SHEET_MARGIN + 5, i * t + t // 2), "Panorama unavailable", fill="black")
             continue
-        for j, fi in enumerate([0, 5, 1, 2, 3, 4]):
-            im = Image.open(io.BytesIO(requests.get(faces[fi], timeout=60).content)).convert("RGB").resize((t, t))
-            sheet.paste(im, (70 + j * t, i * t))
+        r["sheet_panorama_id"] = pano
+        for j, fi in enumerate(FACE_ORDER):
+            image, jpeg = download_face(sky[pano][fi])
+            save_face(face_path(d, r, fi), image, jpeg)
+            sheet.paste(image.resize((t, t)), (SHEET_MARGIN + j * t, i * t))
         dr.text((6, i * t + t // 2 - 6), r["id"], fill="black")
     sheet.save(d / "room_sheet.jpg", quality=80)
     out = {"model": sid, "floor_z": floor_z, "ceiling_z": ceil_z, "floorplan": fp, "rooms": rooms, "method": method}

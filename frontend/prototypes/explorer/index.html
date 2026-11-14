@@ -119,7 +119,7 @@ button.primary:disabled{opacity:.55;cursor:default}
   <span class="muted small" id="hdrInfo"></span>
   <nav id="sectionNav">
     <a href="#matterport">Matterport</a><a href="#drone">Drone &amp; splat</a>
-    <a href="#vexcel">Vexcel</a><a href="#costar">CoStar</a><a href="/keys">Key check</a>
+    <a href="#vexcel">Vexcel</a><a href="#costar">CoStar</a>
   </nav>
 </div></header>
 <div class="shell">
@@ -180,8 +180,7 @@ const rowSummary = r => r.kind === 'residential'
 function setNav(links) {
   const sid = params().get('m');
   $('#sectionNav').replaceChildren(...links.map(([href, t]) => h('a', { href }, t)),
-    h('a', { href: '/acoustics' + (sid ? '?m=' + encodeURIComponent(sid) : ''), title: 'Room acoustics app (port 8766)' }, 'Acoustics ↗'),
-    h('a', { href: '/keys' }, 'Key check'));
+    h('a', { href: '/acoustics' + (sid ? '?m=' + encodeURIComponent(sid) : ''), title: 'Room acoustics app (port 8766)' }, 'Acoustics ↗'));
 }
 
 // One building = one CoStar listing / property; it can hold many Matterport scans (suites, units).

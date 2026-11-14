@@ -6,7 +6,7 @@ Run from `backend/` with the backend Python environment active:
 
 ```bash
 python3 -m app.pipeline.fetch_building                 # cache Matterport, Vexcel, CoStar, drone catalog, OpenStreetMap outlines
-python3 -m prototypes.explorer                         # http://localhost:8765  (SDK key check at /keys)
+python3 -m prototypes.explorer                         # http://localhost:8765
 ```
 
 The room acoustics app is separate (http://localhost:8765/acoustics redirects to it). Both apps
@@ -20,7 +20,7 @@ for that model. Open the [React app](http://localhost:5173) to pick an analysed 
 its floor plan or room list. In this explorer, `?m=<sid>` opens a specific scan.
 
 Use `--model <sid>` on the download command for another model (any id in the kit CSVs). Keys come from
-`<project>/.env` or `key-check/.env`. Needs `requests numpy pillow`.
+the shell or `<project>/.env`. Needs `requests numpy pillow`.
 
 ## Files
 

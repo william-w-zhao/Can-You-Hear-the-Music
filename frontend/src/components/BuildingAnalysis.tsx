@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, type AnalysisJob, type RoomMaterials } from "../api";
 
-type Props = { sid: string; initialJobId?: string; onReady: () => void };
+type Props = { sid: string; initialJobId?: string; onReady: () => void; visionOnly?: boolean };
 type Review = NonNullable<AnalysisJob["review"]>;
 const surfaceFields = ["floor", "ceiling", "walls"] as const;
 
@@ -37,10 +37,13 @@ function MaterialReview({ sid, review, onSave, busy }: {
       )}
       {review.rooms.map((room) => {
         const suggestion = review.suggestions[room.id];
+        const hints = review.object_hints?.[room.id];
         return (
           <fieldset className="material-fields" key={room.id} disabled={busy}>
             <legend>{room.id.toUpperCase()} · {room.matterport_label || `${room.area_m2} m²`}</legend>
             {suggestion && <p>Suggested labels · {Math.round(suggestion.confidence * 100)}% model confidence</p>}
+            {Boolean(hints?.objects.length) && <p>YOLO saw: {hints?.objects.join(", ")}.</p>}
+            {Boolean(hints?.candidates.length) && <p>Check these against the panorama: {hints?.candidates.join(", ")}.</p>}
             <label>Room name<input required maxLength={100} name={`${room.id}-type`}
               defaultValue={suggestion?.type || room.matterport_label || `Room ${room.id.toUpperCase()}`} /></label>
             {surfaceFields.map((field) => (
@@ -67,7 +70,7 @@ function MaterialReview({ sid, review, onSave, busy }: {
   );
 }
 
-export default function BuildingAnalysis({ sid, initialJobId, onReady }: Props) {
+export default function BuildingAnalysis({ sid, initialJobId, onReady, visionOnly = false }: Props) {
   const [jobId, setJobId] = useState(initialJobId);
   const [pollVersion, setPollVersion] = useState(0);
   const [job, setJob] = useState<AnalysisJob | null>(null);
@@ -131,12 +134,14 @@ export default function BuildingAnalysis({ sid, initialJobId, onReady }: Props) 
 
   return (
     <section className="details-panel" aria-labelledby="analysis-title">
-      <h2 id="analysis-title">Building analysis</h2>
-      <p role="status">{job?.message || (jobId ? "Checking analysis progress…" : "Prepare room outlines and estimate echo times for this scan.")}</p>
+      <h2 id="analysis-title">{visionOnly ? "Image analysis" : "Building analysis"}</h2>
+      <p role="status">{job?.message || (jobId ? "Checking analysis progress…" : visionOnly
+        ? "Look for objects in the room panoramas and roofs in the aerial image."
+        : "Prepare room outlines, detect objects and estimate echo times for this scan.")}</p>
       {error && <p className="intro" role="alert">{error}</p>}
       {(!jobId || job?.status === "failed") && (
         <button className="show-more" disabled={busy} onClick={() => void start()}>
-          {job?.status === "failed" ? "Retry analysis" : "Analyse building"}
+          {job?.status === "failed" ? "Retry analysis" : visionOnly ? "Run image analysis" : "Analyse building"}
         </button>
       )}
       {job?.status === "needs_materials" && job.review && (

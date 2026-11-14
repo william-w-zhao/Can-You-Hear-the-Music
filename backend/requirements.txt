@@ -6,5 +6,6 @@ scipy
 pillow
 scikit-image
 anthropic
-deepagents
-langchain-anthropic
+deepagents>=0.7.38,<0.8
+langchain-anthropic>=1.7.10,<2
+langchain-openai>=1.8,<2
