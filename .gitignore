@@ -1,0 +1,29 @@
+# ---- Keys and secrets: never commit ----
+.env
+.env.*
+!.env.example
+**/.env
+.claude/settings.local.json
+
+# ---- Data: never commit (licensed for hackathon use only, or downloaded with our keys) ----
+# CoStar's data kit (property records, listings, tenants)
+costar-hackathon-kit/
+# Shared cache: Matterport scans, panoramas, point clouds, Vexcel imagery, CoStar records per model
+data/
+# Images saved by the key check
+key-check/out/
+# Generated audio
+acoustics/audio/
+# Any stray data files, wherever they end up
+*.jsonl
+*.csv
+*.npy
+*.ply
+*.xyz
+*.zip
+*.dxf
+
+# ---- Build and OS clutter ----
+__pycache__/
+*.pyc
+.DS_Store
