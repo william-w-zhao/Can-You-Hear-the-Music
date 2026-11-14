@@ -3,6 +3,22 @@ import { api, ApiError } from "../src/api";
 import { details, plan, second } from "./fixtures";
 
 describe("documented room API fetching", () => {
+  it("fetches the cached room contact sheet through the same-origin API module", async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(new Uint8Array([1, 2, 3]), {
+          headers: { "Content-Type": "image/jpeg" },
+        }),
+      );
+    vi.stubGlobal("fetch", fetcher);
+    const image = await api.roomImageSheet("office");
+    expect(image.type).toBe("image/jpeg");
+    expect(fetcher).toHaveBeenCalledWith(
+      "/data/office/room_sheet.jpg",
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+  });
   it("keeps identical room IDs scoped to their scans and decodes responses", async () => {
     const fetcher = vi
       .fn()
@@ -71,18 +87,16 @@ describe("documented room API fetching", () => {
   it("formats field validation errors", async () => {
     vi.stubGlobal(
       "fetch",
-      vi
-        .fn()
-        .mockResolvedValue(
-          Response.json(
-            {
-              detail: [
-                { loc: ["body", "glass_m2"], msg: "Must be non-negative" },
-              ],
-            },
-            { status: 422 },
-          ),
+      vi.fn().mockResolvedValue(
+        Response.json(
+          {
+            detail: [
+              { loc: ["body", "glass_m2"], msg: "Must be non-negative" },
+            ],
+          },
+          { status: 422 },
         ),
+      ),
     );
     await expect(api.whatIf("office", "r1", { glass_m2: 2 })).rejects.toThrow(
       "body.glass_m2: Must be non-negative",

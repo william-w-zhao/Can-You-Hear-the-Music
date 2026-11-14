@@ -19,6 +19,8 @@ The specific-room page at `/b/:sid/r/:rid` now supports room-to-room acoustic an
 
 The room page loads room geometry and acoustic details through `src/api.ts`, shows baseline materials and three-band RT60, compares another room in the same scan, and supports material what-ifs without replacing the baseline. Voice and clap comparisons use the same gain and the prototype's synthetic impulse-response model. A missing voice clip disables voice playback while leaving clap playback available. All styles are scoped to `.room-page`.
 
+The room image section reads `/data/{sid}/room_sheet.jpg` through `api.ts`. The existing pipeline writes one 200 px row per room in directory order, with six 200 px tiles after a 70 px ID gutter: ceiling, floor, then four walls. The gallery checks the sheet dimensions before showing the selected room's row. Missing or mismatched images show a clearly labeled illustration and a retry control; the illustration is not a reconstruction or scan photograph. No backend changes or service-key requests are needed.
+
 Cached reads require no browser API credentials. Matterport, Vexcel and other service keys stay on the backend. Requests use relative `/api/buildings/{sid}/rooms/...` URLs; Vite proxies `/api` and `/data` to port 8000. The frontend serves `/audio/voice.wav` from `public/audio/` when the API reports a voice clip. Never add service keys to frontend environment variables or requests.
 
 Loading/error/retry states, cancellation during navigation, malformed acoustic-response checks and non-negative glass-area validation are included. New-scan analysis and agent endpoints remain scaffolds and are not called by this page. The prototypes remain available.

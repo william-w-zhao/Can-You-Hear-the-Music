@@ -165,6 +165,12 @@ function checkedRoom(room: RoomAcoustics): RoomAcoustics {
 }
 
 export const api = {
+  roomImageSheet: async (sid: string, signal?: AbortSignal) =>
+    (
+      await request(`/data/${encodeURIComponent(sid)}/room_sheet.jpg`, {
+        signal,
+      })
+    ).blob(),
   buildings: (query = "") => get<BuildingSummary[]>(`/api/buildings${query}`),
   building: (sid: string) =>
     get<BuildingSummary>(`/api/buildings/${encodeURIComponent(sid)}`),

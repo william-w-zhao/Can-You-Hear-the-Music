@@ -7,6 +7,7 @@ import EchoChart from "../components/EchoChart";
 import Listen from "../components/Listen";
 import WhatIf from "../components/WhatIf";
 import RoomComparison from "../components/RoomComparison";
+import RoomImages from "../components/RoomImages";
 import "../room.css";
 
 export default function RoomView() {
@@ -107,6 +108,7 @@ function RoomWorkspace({ sid, rid }: { sid: string; rid: string }) {
                 </span>
               </div>
             )}
+            <RoomImages sid={sid} rid={rid} name={base.type} plan={data.plan} />
             <RoomComparison
               baseline={data.details}
               other={comparison.data}
