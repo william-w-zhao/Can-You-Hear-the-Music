@@ -1,6 +1,6 @@
 # Key check
 
-Tests every key the Sunlight Simulator needs, using the same endpoints and auth as the official
+Tests the API keys for Can You Hear the Music, using the same endpoints and auth as the official
 Matterport quickstart.
 
 ```bash
@@ -13,7 +13,7 @@ python3 serve.py          # then open http://localhost:8765 for the Showcase SDK
 |---|---|---|
 | Matterport Model API | `MATTERPORT_API_KEY` + `MATTERPORT_API_TOKEN` (basic auth) | Folder access, model basics + lat/lon, rooms and wall graph, a panorama download, MatterPak availability |
 | Vexcel ortho | `VEXCEL_API_KEY` (`X-API-KEY` header) | A 140 m aerial clip around the model, saved to `out/vexcel_ortho.jpg` |
-| CoStar kit | none (local files) | The model id joins to a CoStar record; how many buildings have height/stories for validating shadow heights |
+| CoStar kit | none (local files) | The model ID joins to a CoStar property or listing record |
 | Splat site | none (optional site login) | The model's drone/splat listing is reachable |
 | Showcase SDK | `MATTERPORT_SDK_KEY` | The 3D viewer accepts the key on this origin; Model, Camera, Sweep and Room data come back |
 

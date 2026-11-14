@@ -6,7 +6,7 @@ Building explorer + SDK key check on http://localhost:8765 (localhost only; the 
     /keys                 Showcase SDK key check (key-check/sdk_test.html)
     /api/catalog          every model in the kit CSVs, with a short CoStar summary and a "cached" flag
     /api/kit/<sid>        that model's full CoStar records from the kit (no network)
-    POST /api/fetch/<sid> run the fetch_building and shadows pipeline modules in the background
+    POST /api/fetch/<sid> run the building download in the background
     GET  /api/fetch/<sid> that job's status and log
     /api/names?ids=a,b    Matterport model names (e.g. "Suite 410 - 3,500 SF"), cached in data/names.json
 
@@ -65,19 +65,13 @@ def cached_ids():
 
 def run_job(sid):
     job = JOBS[sid]
-    steps = ("app.pipeline.fetch_building", "app.pipeline.shadows")
-    for i, module in enumerate(steps):
-        cmd = [sys.executable, "-u", "-m", module, "--model", sid]
-        job["log"].append(f"$ python -m {module} --model {sid}")
-        p = subprocess.Popen(cmd, cwd=BACKEND, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        for line in p.stdout:
+    module = "app.pipeline.fetch_building"
+    cmd = [sys.executable, "-u", "-m", module, "--model", sid]
+    job["log"].append(f"$ python -m {module} --model {sid}")
+    with subprocess.Popen(cmd, cwd=BACKEND, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True) as process:
+        for line in process.stdout:
             job["log"].append(line.rstrip())
-        if p.wait() != 0:
-            if i == 0:                      # no bundle: the page has nothing new to show
-                job["state"] = "failed"
-                return
-            job["log"].append("(shadow heights could not be computed for this model; the rest is saved)")
-    job["state"] = "done"
+        job["state"] = "done" if process.wait() == 0 else "failed"
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):

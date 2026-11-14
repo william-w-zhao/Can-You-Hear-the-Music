@@ -154,7 +154,6 @@ def fetch_costar(sid, box, bundle):
         cs["property"] = find_jsonl(KIT / "data" / "commercial-property.jsonl", [pid]).get(pid)
         cs["match"] = {"kind": "commercial", "id": pid, "address": com["Address"]}
     # Project nearby properties onto the same pixel grid as the Vexcel image.
-    # The shadow prototype can use their reported heights and story counts as references.
     with open(KIT / "data" / "commercial-property.jsonl") as fh:
         for line in fh:
             p = json.loads(line)

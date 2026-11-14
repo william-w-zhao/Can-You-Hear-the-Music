@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Key check for the Sunlight Simulator (HackPrinceton 2026, CoStar track).
+Key check for Can You Hear the Music (HackPrinceton 2026, CoStar track).
 
 Tests each key with the smallest real call, using the same endpoints and auth as
 CoStar/Matterport's official quickstart:
@@ -122,7 +122,7 @@ def test_matterport(model):
         report("Model basics", False, str(e))
         return None
 
-    # Layer 03 needs rooms + walls; check the floor-plan graph is reachable.
+    # Check that the scan exposes the room and wall geometry used by the explorer.
     try:
         d = mp_graph(s, """query($id: ID!) { model(id: $id) {
             floors { vertices { id } edges { id type } }
@@ -195,12 +195,6 @@ def test_vexcel(latlon):
         (OUT / "vexcel_ortho.jpg").write_bytes(r.content)
         report("Ortho extract", True, f"140 m square around {lat:.5f},{lon:.5f} → out/vexcel_ortho.jpg "
                                       f"({len(r.content)//1024} KB, {time.time()-t:.1f}s)")
-        # Layer 02 needs the capture time for the sun angle; surface any metadata headers Vexcel returns.
-        meta = {k: v for k, v in r.headers.items() if any(w in k.lower() for w in ("date", "capture", "vexcel", "x-"))}
-        if meta:
-            print(f"  {DIM}response headers worth checking for capture time: {json.dumps(meta)}{END}")
-        print(f"  {YELLOW}NOTE{END}: the shadow→height trick needs the image's capture timestamp. "
-              f"Ask Vexcel which endpoint returns it (e.g. a catalog/metadata call).")
 
 
 # --------------------------------------------------------------------------- CoStar kit
@@ -240,13 +234,6 @@ def test_costar(model):
         p = rec.get("property") or {}
         extra = f"keys: {', '.join(list(p)[:6])}…"
     report("Model → CoStar join", True, f"{kind} {rid} · {addr} · {extra}")
-    with open(KIT / "data" / "commercial-property.jsonl") as fh:
-        n = h = 0
-        for line in fh:
-            r = json.loads(line)
-            n += 1
-            h += r.get("buildingHeightInFeet") is not None or r.get("numStoriesAboveGrade") is not None
-    report("Height ground truth (layer 02 validation)", True, f"{h:,} of {n:,} commercial properties have height or stories")
 
 
 # --------------------------------------------------------------------------- Splat site

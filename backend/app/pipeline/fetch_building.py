@@ -6,7 +6,7 @@ Fetch and cache everything about one Matterport model and its block, for the exp
     python3 -m app.pipeline.fetch_building --model <sid>   # any model id from the kit CSVs
 
 Writes data/<sid>/: bundle.json (all records), ortho.png (analysis) + ortho.jpg (page),
-osm.json (building outlines with LA County heights), preview.jpg, floorplan images,
+osm.json (building outlines), preview.jpg, floorplan images,
 pano_equirect.jpg / pano_defurnished.jpg. About 20 MB per model, a few seconds.
 Signed Matterport links expire, so images are downloaded rather than linked.
 """

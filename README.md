@@ -18,7 +18,7 @@ Can You Hear the Music/
 │   │   ├── api/                  buildings · rooms · acoustics · jobs · agent (live stream)
 │   │   ├── sources/              configuration · Matterport · Vexcel · OpenStreetMap · CoStar kit
 │   │   ├── pipeline/             fetch_building · pointcloud · rooms (point-cloud split) ·
-│   │   │                         materials (Claude vision) · acoustics (Eyring engine) · shadows (parked)
+│   │   │                         materials (Claude vision) · acoustics (Eyring engine)
 │   │   └── agent/                deepagents: main agent, sub-agents, tools wrapping pipeline/
 │   ├── prototypes/               local servers for the explorer and acoustics demos
 │   ├── tests/

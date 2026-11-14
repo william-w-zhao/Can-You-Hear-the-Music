@@ -9,25 +9,21 @@
 :root{
   --bg:#f4f6f9; --surface:#ffffff; --surface-2:#eef1f6; --ink:#121a2b; --muted:#5a6577; --faint:#8a94a6; --line:#d7dde6;
   --accent:#9a5f00; --accent-soft:#fcefcb; --link:#2a63c9;
-  --ref:#eb6834; --target:#6250d6; --costar:#1baf7a;
   --good:#0ca30c; --warning:#fab219; --serious:#ec835a; --critical:#d03b3b;
-  --mid:#f0efec;
-  --s100:#cde2fb; --s250:#86b6ef; --s400:#3987e5; --s550:#1c5cab; --s700:#0d366b;
-  --d-red:#e34948;
   --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
   color-scheme:light;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --bg:#0e1420; --surface:#151d2c; --surface-2:#1b2435; --ink:#e6ebf3; --muted:#9da8ba; --faint:#6f7a8d; --line:#273246;
-    --accent:#f5c55a; --accent-soft:#3a2e12; --link:#7fa6f0; --ref:#d95926; --target:#9085e9; --costar:#199e70;
-    --mid:#383835; --d-red:#e66767; color-scheme:dark;
+    --accent:#f5c55a; --accent-soft:#3a2e12; --link:#7fa6f0;
+    color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
   --bg:#0e1420; --surface:#151d2c; --surface-2:#1b2435; --ink:#e6ebf3; --muted:#9da8ba; --faint:#6f7a8d; --line:#273246;
-  --accent:#f5c55a; --accent-soft:#3a2e12; --link:#7fa6f0; --ref:#d95926; --target:#9085e9; --costar:#199e70;
-  --mid:#383835; --d-red:#e66767; color-scheme:dark;
+  --accent:#f5c55a; --accent-soft:#3a2e12; --link:#7fa6f0;
+  color-scheme:dark;
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
@@ -60,27 +56,14 @@ section > .sub{color:var(--muted);margin:0 0 12px}
 .tile .v{font-size:1.45rem;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.25}
 .tile .s{font-size:.8rem;color:var(--muted)}
 .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
-.mapwrap{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:start}
-.map{position:relative;overflow:hidden;border-radius:10px;border:1px solid var(--line);background:#000;aspect-ratio:1/1;cursor:grab;touch-action:none}
-.map.dragging{cursor:grabbing}
-.map .stage{position:absolute;inset:0;transform-origin:0 0}
-.map img,.map svg{position:absolute;inset:0;width:100%;height:100%;display:block;user-select:none;-webkit-user-drag:none}
-.map svg polygon{vector-effect:non-scaling-stroke;cursor:pointer}
-.map .ctrls{position:absolute;right:8px;top:8px;display:flex;flex-direction:column;gap:4px;z-index:3}
-.map .ctrls button{width:32px;height:32px;padding:0;background:rgba(255,255,255,.92);color:#121a2b;border-color:#ccd}
 .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
-.toolbar label{display:inline-flex;gap:5px;align-items:center;font-size:.88rem;color:var(--muted)}
 .legend{display:flex;gap:12px;flex-wrap:wrap;align-items:center;font-size:.8rem;color:var(--muted);margin-top:8px}
 .legend .sw{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:4px}
-.legend .ramp{width:160px;height:10px;border-radius:3px;display:inline-block;vertical-align:-1px;margin:0 4px}
-.panel{border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--bg);font-size:.9rem}
-.panel h4{margin:0 0 6px;font-size:.95rem}
 table{border-collapse:collapse;width:100%;font-size:.86rem}
 th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
 th{font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600;background:var(--surface-2);position:sticky;top:0}
-th.sortable{cursor:pointer} td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .tablebox{max-height:420px;overflow:auto;border:1px solid var(--line);border-radius:9px}
-tr.sel td{background:var(--accent-soft)}
 tbody tr:hover td{background:var(--surface-2)}
 .kv{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 14px;font-size:.9rem}
 .kv dt{color:var(--muted)} .kv dd{margin:0;overflow-wrap:anywhere}
@@ -89,9 +72,6 @@ tbody tr:hover td{background:var(--surface-2)}
 details{border:1px solid var(--line);border-radius:9px;padding:8px 12px;margin-top:10px;background:var(--bg)}
 details summary{cursor:pointer;font-weight:600;font-size:.9rem}
 pre.json{max-height:420px;overflow:auto;font:12px/1.5 var(--mono);margin:8px 0 0;white-space:pre-wrap;word-break:break-word}
-.chart{width:100%;height:auto;display:block}
-.chart text{fill:var(--muted);font-size:11px}
-.chart .grid line{stroke:var(--line);stroke-width:1}
 .tip{position:fixed;pointer-events:none;z-index:50;background:var(--ink);color:var(--surface);padding:7px 9px;border-radius:7px;font-size:.8rem;line-height:1.4;max-width:280px;display:none;box-shadow:0 4px 14px rgba(0,0,0,.25)}
 .pano{height:380px;border-radius:10px;border:1px solid var(--line);background-repeat:repeat-x;background-size:auto 100%;cursor:grab;touch-action:none}
 .plan{position:relative;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}
@@ -144,7 +124,7 @@ aside.picker{position:sticky;top:var(--hdr,53px);height:calc(100vh - var(--hdr,5
 button.primary{background:var(--ink);color:var(--surface);border-color:var(--ink);padding:7px 14px}
 button.primary:disabled{opacity:.55;cursor:default}
 .hero .noimg{aspect-ratio:4/3;border-radius:10px;border:1px dashed var(--line);display:grid;place-items:center;color:var(--faint);font-size:.9rem;text-align:center;padding:16px}
-@media (max-width:960px){.hero,.mapwrap,.grid2{grid-template-columns:1fr}.top-inner nav{margin-left:0}
+@media (max-width:960px){.hero,.grid2{grid-template-columns:1fr}.top-inner nav{margin-left:0}
   .shell{grid-template-columns:1fr} aside.picker{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line)} .picker ul{max-height:300px}}
 </style>
 </head>
@@ -153,8 +133,8 @@ button.primary:disabled{opacity:.55;cursor:default}
   <strong>Building explorer</strong>
   <span class="muted small" id="hdrInfo"></span>
   <nav id="sectionNav">
-    <a href="#shadows">Shadow heights</a><a href="#matterport">Matterport</a><a href="#drone">Drone &amp; splat</a>
-    <a href="#vexcel">Vexcel</a><a href="#costar">CoStar</a><a href="#osm">Outlines</a><a href="/keys">Key check</a>
+    <a href="#matterport">Matterport</a><a href="#drone">Drone &amp; splat</a>
+    <a href="#vexcel">Vexcel</a><a href="#costar">CoStar</a><a href="/keys">Key check</a>
   </nav>
 </div></header>
 <div class="shell">
@@ -198,7 +178,6 @@ function h(tag, attrs = {}, ...kids) {
 const fmt = (v, d = 1) => v == null || Number.isNaN(v) ? '–' : Number(v).toLocaleString(undefined, { maximumFractionDigits: d, minimumFractionDigits: 0 });
 const money = v => v == null ? '–' : '$' + Number(v).toLocaleString();
 const date = s => s ? new Date(s).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '–';
-const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const tip = $('#tip');
 function showTip(ev, html) { tip.innerHTML = html; tip.style.display = 'block';
   const x = Math.min(ev.clientX + 14, innerWidth - tip.offsetWidth - 8), y = Math.min(ev.clientY + 14, innerHeight - tip.offsetHeight - 8);
@@ -208,18 +187,6 @@ function kv(pairs) { return h('dl', { class: 'kv' }, pairs.filter(p => p).flatMa
 function tile(k, v, s, extra = {}) { return h('div', { class: 'tile', ...extra }, h('div', { class: 'k' }, k), h('div', { class: 'v' }, v), s ? h('div', { class: 's' }, s) : null); }
 function rawJson(title, obj) { return h('details', {}, h('summary', {}, title), h('pre', { class: 'json' }, JSON.stringify(obj, null, 1))); }
 function guard(title, fn) { try { return fn(); } catch (e) { console.error(e); return h('section', {}, h('h2', {}, title), h('p', { class: 'err' }, 'Could not render: ' + e.message)); } }
-
-// Sequential blue ramp (light -> dark) and diverging blue <-> red with neutral mid.
-const SEQ = ['#cde2fb', '#9ec5f4', '#6da7ec', '#3987e5', '#256abf', '#184f95', '#0d366b'];
-function lerpHex(a, b, t) { const p = x => [1, 3, 5].map(i => parseInt(x.slice(i, i + 2), 16)); const A = p(a), B = p(b);
-  return '#' + A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, '0')).join(''); }
-function rampColor(stops, t) { t = Math.max(0, Math.min(1, t)); const x = t * (stops.length - 1), i = Math.min(Math.floor(x), stops.length - 2); return lerpHex(stops[i], stops[i + 1], x - i); }
-const seq = (v, max) => rampColor(SEQ, v / max);
-function div(v, lim) { const mid = css('--mid') || '#f0efec'; const t = Math.max(-1, Math.min(1, v / lim));
-  return t < 0 ? lerpHex(mid, '#1c5cab', -t) : lerpHex(mid, '#e34948', t); }
-const STATUS = { ok: null, 'shadow on another roof': 'var(--warning)', 'no shadow found': 'var(--faint)', 'outline mismatch': 'var(--critical)', 'too small': 'var(--faint)' };
-
-let STATE = {};
 
 // ------------------------------------------------------------------ Building picker
 let CATALOG = [], BUILDINGS = [], BY_SID = {}, ENUMS = {}, NAMES = {}, CURRENT = null;
@@ -354,12 +321,12 @@ async function renderKitOnly(sid, row) {
   const L = kit.listing, P = L?.property, C = kit.property;
   const photo = L?.media?.find(m => /imagescdn|\.jpe?g/i.test(m.uri) && !/matterport/.test(m.uri))?.uri || C?.primaryPhoto?.attachmentUri;
   const lat = row?.lat, lon = row?.lon;
-  const avail = [['CoStar kit records', !!(L || C)], ['Matterport scan & rooms', false], ['Vexcel aerial', false], ['LA County outlines', false], ['Shadow heights', false]];
+  const avail = [['CoStar kit records', !!(L || C)], ['Matterport scan & rooms', false], ['Vexcel aerial', false], ['Building outlines', false]];
   const fetchBox = h('div', { class: 'callout', id: 'fetch' });
   const btn = h('button', { class: 'primary', onclick: () => startFetch(sid, btn, fetchBox) }, 'Download scan, rooms & aerial data');
   fetchBox.append(h('p', {}, h('b', {}, 'Rooms, floor plan, panoramas and aerial imagery are not downloaded for this building yet. '),
-      'This runs fetch_building.py and shadows.py for it (about 20 MB, under a minute; uses your Matterport and Vexcel keys).'),
-    h('div', { class: 'toolbar', style: 'margin:8px 0 0' }, btn, h('span', { class: 'muted small' }, 'Shadow heights only work where LA County outlines exist.')));
+      'This uses your Matterport and Vexcel keys.'),
+    h('div', { class: 'toolbar', style: 'margin:8px 0 0' }, btn));
   const hero = h('div', { class: 'hero' },
     h('div', {},
       h('div', { class: 'muted small mono' }, `${sid} · CoStar ${row?.kind} ${row?.costar_id}${row?.also_commercial ? ` · also commercial ${row.also_commercial}` : ''}`),
@@ -395,242 +362,36 @@ async function startFetch(sid, btn, box) {
 // A building with everything downloaded: the full explorer.
 async function renderFull(sid, room) {
   const base = `data/${sid}/`;
-  const [bundle, shadows] = await Promise.all([
-    fetch(base + 'bundle.json').then(r => r.json()),
-    fetch(base + 'shadows.json').then(r => r.ok ? r.json() : null).catch(() => null)]);
+  const bundle = await fetch(base + 'bundle.json').then(r => r.json());
   if (CURRENT !== sid) return;
-  STATE = { sid, base, bundle, shadows, room };
-  setNav([['#rooms', 'Rooms'], ['#shadows', 'Shadow heights'], ['#matterport', 'Matterport'], ['#drone', 'Drone & splat'], ['#vexcel', 'Vexcel'], ['#costar', 'CoStar'], ['#osm', 'Outlines']]);
+  setNav([['#rooms', 'Rooms'], ['#matterport', 'Matterport'], ['#drone', 'Drone & splat'],
+    ['#vexcel', 'Vexcel'], ['#costar', 'CoStar']]);
   const app = $('#app');
   app.replaceChildren(
-    guard('Overview', () => renderHero(bundle, shadows, base)),
+    guard('Overview', () => renderHero(bundle, base)),
     guard('Rooms', () => renderRooms(bundle, base, room)),
-    shadows ? guard('Shadow heights', () => renderShadows(bundle, shadows, base)) : h('section', { id: 'shadows' }, h('h2', {}, 'Shadow heights'), h('p', {}, 'From backend/, run python3 -m app.pipeline.shadows --model with this scan ID.')),
     guard('Matterport', () => renderMatterport(bundle, base)),
     guard('Drone & splat', () => renderDrone(bundle)),
     guard('Vexcel', () => renderVexcel(bundle, base)),
     guard('CoStar', () => renderCostar(bundle)),
-    shadows ? guard('Outlines', () => renderOutlines(bundle, shadows)) : null,
   );
   if (bundle.errors?.length) app.prepend(h('p', { class: 'err' }, 'Fetch errors: ' + bundle.errors.join('; ')));
 }
 
 // ------------------------------------------------------------------ Overview
-function renderHero(b, s, base) {
+function renderHero(b, base) {
   const m = b.matterport.basics, cs = b.costar || {}, L = cs.listing, P = L?.property;
   const src = [
     ['Matterport', !!b.matterport], ['Vexcel', !!b.vexcel], ['CoStar', !!cs.match], ['Drone + splat', !!b.site?.available],
-    ['LA County outlines', !!b.osm], ['Shadow heights', !!s]];
+    ['Building outlines', !!b.osm]];
   return h('div', { class: 'hero' },
     h('div', {},
       h('div', { class: 'muted small mono' }, b.sid + (cs.match ? ` · CoStar ${cs.match.kind} ${cs.match.id}` : '')),
       h('h1', {}, m.address?.address || m.name),
       h('p', { class: 'muted' }, `${fmt(+m.geolocation.lat, 6)}, ${fmt(+m.geolocation.long, 6)} · ${m.floors.length} floor · ${m.rooms.length} rooms · ${m.panoLocations.length} scan positions`),
       P ? h('p', {}, `${P.bedsMax} bed · ${P.bathsMax} bath · ${fmt(P.sqftMax, 0)} sq ft · built ${P.yearBuilt} · ${P.stories} story · ${money(L.currentPrice)}`) : null,
-      h('div', { class: 'chips' }, src.map(([n, ok]) => h('span', { class: 'chip' }, h('span', { class: 'dot', style: `background:var(${ok ? '--good' : '--faint'})` }), n + (ok ? '' : ' (missing)')))),
-      s ? h('div', { class: 'callout' },
-        h('p', {}, h('b', {}, 'From one aerial photo with no timestamp: '),
-          `the sun stood ${s.sun_elevation}° above the horizon at azimuth ${s.sun_azimuth}°, calibrated on ${s.reference.name} (${s.reference.height_source}). ` +
-          `Heights for ${s.status_counts.ok} buildings, median error ${s.validation.median_abs_err_m} m against LA County's measured heights.`)) : null),
+      h('div', { class: 'chips' }, src.map(([n, ok]) => h('span', { class: 'chip' }, h('span', { class: 'dot', style: `background:var(${ok ? '--good' : '--faint'})` }), n + (ok ? '' : ' (missing)'))))),
     b.matterport.preview_size ? h('img', { src: base + 'preview.jpg', alt: 'Matterport preview of ' + m.name }) : null);
-}
-
-// ------------------------------------------------------------------ Shadows
-function renderShadows(b, s, base) {
-  const ref = s.reference, v = s.validation, B = s.buildings;
-  const byId = Object.fromEntries(B.map(x => [x.osm_id, x]));
-  const D = s.display_px;
-  const sec = h('section', { id: 'shadows' },
-    h('h2', {}, 'Building heights from shadows'),
-    h('p', { class: 'sub' }, 'No capture time needed: one CoStar building with a known story count calibrates the sun angle for the whole image, then every shadow length becomes a height.'));
-
-  const cands = s.capture_candidates.map(c => c.local).join(' or ') || 'none within 3°';
-  sec.append(h('div', { class: 'tiles' },
-    tile('Shadows point', `${s.shadow_bearing}°`, 'compass bearing, found from the image'),
-    tile('Sun elevation', `${s.sun_elevation}°`, `${s.sun_elevation_range[0]}–${s.sun_elevation_range[1]}° from story-height range`),
-    tile('Reference', ref.name.replace(' by Category', ''), `${ref.height_m} m tall, ${ref.shadow_m} m shadow`),
-    tile('Median error', `${v.median_abs_err_m} m`, `vs LA County on ${v.n} buildings (bias ${v.bias_m > 0 ? '+' : ''}${v.bias_m} m)`),
-    tile('Photo taken around', s.capture_candidates[0]?.local.split(',')[0] || '–', cands)));
-
-  // Map
-  const mode = h('select', { 'aria-label': 'Color buildings by' },
-    h('option', { value: 'est' }, 'Estimated height'), h('option', { value: 'gt' }, 'LA County height'),
-    h('option', { value: 'err' }, 'Error (estimate − LA County)'), h('option', { value: 'status' }, 'Measurement status'));
-  const mask = h('input', { type: 'checkbox' }); const outl = h('input', { type: 'checkbox', checked: true });
-  const toolbar = h('div', { class: 'toolbar' }, h('label', {}, 'Color by', mode),
-    h('label', {}, outl, 'Outlines'), h('label', {}, mask, 'Shadow mask'));
-  const svg = h('svg', { viewBox: `0 0 ${D} ${D}` });
-  const maskImg = h('img', { src: base + 'shadow_mask.png', alt: '', style: 'display:none' });
-  const stage = h('div', { class: 'stage' }, h('img', { src: base + 'ortho.jpg', alt: 'Vexcel ortho of the block' }), maskImg, svg);
-  const zoom = { k: 1, x: 0, y: 0 };
-  const map = h('div', { class: 'map' }, stage, h('div', { class: 'ctrls' },
-    h('button', { title: 'Zoom in', onclick: () => zoomBy(1.5) }, '+'), h('button', { title: 'Zoom out', onclick: () => zoomBy(1 / 1.5) }, '−'),
-    h('button', { title: 'Reset view', onclick: () => { Object.assign(zoom, { k: 1, x: 0, y: 0 }); apply(); } }, '⟲')));
-  function apply() { const w = map.clientWidth; zoom.k = Math.max(1, Math.min(8, zoom.k));
-    zoom.x = Math.min(0, Math.max(w - w * zoom.k, zoom.x)); zoom.y = Math.min(0, Math.max(w - w * zoom.k, zoom.y));
-    stage.style.transform = `translate(${zoom.x}px,${zoom.y}px) scale(${zoom.k})`; }
-  function zoomBy(f, cx, cy) { const w = map.clientWidth; cx ??= w / 2; cy ??= w / 2;
-    zoom.x = cx - (cx - zoom.x) * f; zoom.y = cy - (cy - zoom.y) * f; zoom.k *= f; apply(); }
-  map.addEventListener('wheel', e => { e.preventDefault(); const r = map.getBoundingClientRect(); zoomBy(e.deltaY < 0 ? 1.2 : 1 / 1.2, e.clientX - r.left, e.clientY - r.top); }, { passive: false });
-  let drag = null;
-  map.addEventListener('pointerdown', e => { if (e.target.closest('.ctrls')) return; drag = { x: e.clientX, y: e.clientY, zx: zoom.x, zy: zoom.y, moved: false }; map.classList.add('dragging'); });
-  addEventListener('pointermove', e => { if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true; zoom.x = drag.zx + dx; zoom.y = drag.zy + dy; apply(); });
-  addEventListener('pointerup', () => { if (drag) setTimeout(() => drag = null, 0); map.classList.remove('dragging'); });
-  function focusOn(px, py, k = 3) { const w = map.clientWidth, f = w / D; zoom.k = k; zoom.x = w / 2 - px * f * k; zoom.y = w / 2 - py * f * k; apply(); }
-
-  const panel = h('div', { class: 'panel' }, h('h4', {}, 'Click a building'), h('p', { class: 'muted small' }, 'Hover for details, scroll or use +/− to zoom, drag to pan.'));
-  const legend = h('div', { class: 'legend' });
-  const maxH = 20;
-  const polys = {};
-  let selected = null;
-  function color(bd) {
-    const m = mode.value;
-    if (m === 'status') return bd.status === 'ok' ? 'var(--good)' : STATUS[bd.status];
-    if (bd.status !== 'ok') return null;
-    if (m === 'est') return bd.est_h != null ? seq(bd.est_h, maxH) : null;
-    if (m === 'gt') return bd.lacounty_h != null ? seq(bd.lacounty_h, maxH) : null;
-    if (m === 'err') return bd.lacounty_h != null && bd.est_h != null ? div(bd.est_h - bd.lacounty_h, 8) : null;
-  }
-  function describe(bd, inPanel) {
-    const rows = [
-      !inPanel && bd.reference ? `<b>Reference: ${bd.reference}</b>` : '', !inPanel && bd.osm_id === s.target_osm_id ? '<b>This house</b>' : '',
-      `Status: ${bd.status}`, bd.est_h != null ? `Estimated height: <b>${bd.est_h} m</b> (${bd.est_range[0]}–${bd.est_range[1]})` : '',
-      bd.lacounty_h != null ? `LA County height: ${bd.lacounty_h} m` : 'LA County height: none',
-      bd.shadow_m != null ? `Shadow: ${bd.shadow_m} m (80th pct of ${bd.rows} rows)` : '',
-      bd.start_date ? `Built: ${bd.start_date} (outline record)` : '', `Footprint: ${fmt(bd.area_m2, 0)} m² · ${bd.distance_m} m from the house`];
-    return rows.filter(Boolean).join('<br>');
-  }
-  function select(id, from) {
-    selected = id; const bd = byId[id];
-    Object.entries(polys).forEach(([k, p]) => p.setAttribute('stroke-width', +k === id ? 4 : p.dataset.sw));
-    panel.replaceChildren(h('h4', {}, bd.reference ? `Reference: ${bd.reference}` : bd.osm_id === s.target_osm_id ? 'This house' : `Building ${bd.osm_id}`),
-      h('div', { html: describe(bd, true) }),
-      bd.lacounty_h != null && bd.est_h != null ? h('p', { class: 'small' }, `Error: ${(bd.est_h - bd.lacounty_h).toFixed(1)} m`) : null,
-      h('p', { class: 'small' }, h('a', { href: `https://www.openstreetmap.org/way/${bd.osm_id}`, target: '_blank', rel: 'noopener' }, 'OSM way ' + bd.osm_id)));
-    document.querySelectorAll('#bldTable tr').forEach(tr => tr.classList.toggle('sel', +tr.dataset.id === id));
-    if (from === 'table' || from === 'scatter') { const pts = bd.pts; focusOn(pts.reduce((a, p) => a + p[0], 0) / pts.length, pts.reduce((a, p) => a + p[1], 0) / pts.length); map.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
-  }
-  STATE.selectBuilding = select;
-  function draw() {
-    svg.replaceChildren(); legend.replaceChildren();
-    const g = h('g', { style: outl.checked ? '' : 'display:none' });
-    for (const bd of B) {
-      const c = color(bd), isRef = !!bd.reference, isT = bd.osm_id === s.target_osm_id;
-      const stroke = isRef ? 'var(--ref)' : isT ? 'var(--target)' : c || 'rgba(255,255,255,.75)';
-      const sw = isRef || isT ? 3.5 : 1.3;
-      const p = h('polygon', { points: bd.pts.map(q => q.join(',')).join(' '), fill: c || 'none', 'fill-opacity': c ? (mode.value === 'status' ? .35 : .62) : 0,
-        stroke, 'stroke-width': selected === bd.osm_id ? 4 : sw, 'data-sw': sw, 'stroke-dasharray': c || isRef || isT ? null : '4 3',
-        onmousemove: e => showTip(e, describe(bd)), onmouseleave: hideTip, onclick: () => { if (!drag?.moved) select(bd.osm_id); } });
-      polys[bd.osm_id] = p; g.append(p);
-    }
-    svg.append(g);
-    // CoStar buildings + labels
-    for (const c of b.costar.nearby) {
-      const x = c.px[0] * D / b.vexcel.box.size_px, y = c.px[1] * D / b.vexcel.box.size_px;
-      svg.append(h('circle', { cx: x, cy: y, r: 7, fill: 'var(--costar)', stroke: '#fff', 'stroke-width': 2,
-        onmousemove: e => showTip(e, `<b>CoStar: ${c.name || c.address}</b><br>${c.stories ?? '?'} stories · ${c.distance_m} m away`), onmouseleave: hideTip }));
-    }
-    const tx = D / 2, ty = D / 2;
-    svg.append(h('circle', { cx: tx, cy: ty, r: 6, fill: 'var(--target)', stroke: '#fff', 'stroke-width': 2 }));
-    // Compass: shadow direction and sun direction
-    const cx = 110, cy = 110, r = 70, br = s.shadow_bearing * Math.PI / 180;
-    const ux = Math.sin(br), uy = -Math.cos(br);
-    svg.append(h('g', {},
-      h('circle', { cx, cy, r: r + 18, fill: 'rgba(0,0,0,.55)' }),
-      h('text', { x: cx, y: cy - r - 4, 'text-anchor': 'middle', fill: '#fff', 'font-size': 20, 'font-weight': 700 }, 'N'),
-      h('line', { x1: cx - ux * r, y1: cy - uy * r, x2: cx + ux * r * .85, y2: cy + uy * r * .85, stroke: '#9ec5f4', 'stroke-width': 5 }),
-      h('polygon', { points: `${cx + ux * r},${cy + uy * r} ${cx + ux * r * .7 - uy * 12},${cy + uy * r * .7 + ux * 12} ${cx + ux * r * .7 + uy * 12},${cy + uy * r * .7 - ux * 12}`, fill: '#9ec5f4' }),
-      h('circle', { cx: cx - ux * r, cy: cy - uy * r, r: 13, fill: '#fab219', stroke: '#fff', 'stroke-width': 2 }),
-      h('text', { x: cx, y: cy + r + 36, 'text-anchor': 'middle', fill: '#fff', 'font-size': 17 }, `sun ${s.sun_azimuth}° · ${s.sun_elevation}° up`)));
-    // Legend
-    const m = mode.value;
-    if (m === 'est' || m === 'gt') legend.append(h('span', {}, '0 m', h('span', { class: 'ramp', style: `background:linear-gradient(90deg,${SEQ.join(',')})` }), `${maxH}+ m`));
-    if (m === 'err') legend.append(h('span', {}, '−8 m (too low)', h('span', { class: 'ramp', style: `background:linear-gradient(90deg,#1c5cab,${css('--mid')},#e34948)` }), '+8 m (too high)'));
-    if (m === 'status') Object.entries({ 'measured': 'var(--good)', 'shadow falls on another roof': 'var(--warning)', 'no shadow found / too small': 'var(--faint)', 'outline mismatch': 'var(--critical)' })
-      .forEach(([k, c]) => legend.append(h('span', {}, h('span', { class: 'sw', style: `background:${c}` }), k)));
-    legend.append(h('span', {}, h('span', { class: 'sw', style: 'background:var(--ref)' }), 'reference building'),
-      h('span', {}, h('span', { class: 'sw', style: 'background:var(--target)' }), 'this house'),
-      h('span', {}, h('span', { class: 'sw', style: 'background:var(--costar);border-radius:50%' }), 'CoStar property'),
-      m !== 'status' ? h('span', {}, h('span', { class: 'sw', style: 'border:1.5px dashed var(--muted)' }), 'not measured') : null);
-  }
-  mode.onchange = draw; outl.onchange = draw; mask.onchange = () => maskImg.style.display = mask.checked ? '' : 'none';
-  draw();
-  sec.append(toolbar, h('div', { class: 'mapwrap' }, h('div', {}, map, legend),
-    h('div', {}, panel,
-      h('h3', {}, 'Calibration'),
-      h('table', {}, h('thead', {}, h('tr', {}, h('th', {}, 'CoStar building'), h('th', { class: 'num' }, 'Height'), h('th', { class: 'num' }, 'Shadow'), h('th', { class: 'num' }, 'Implied sun'))),
-        h('tbody', {}, s.references.map(r => h('tr', { style: r === ref || r.costar_id === ref.costar_id ? 'font-weight:600' : '' },
-          h('td', {}, (r.name || '').replace(' by Category', '') + (r.costar_id === ref.costar_id ? ' ✓' : '')),
-          h('td', { class: 'num' }, r.height_m + ' m'), h('td', { class: 'num' }, r.shadow_m ? r.shadow_m + ' m' : '–'),
-          h('td', { class: 'num' }, r.elevation ? r.elevation + '°' : r.why_not ? 'unusable' : '–'))))),
-      h('p', { class: 'small muted' }, 'The reference with the longest shadow for its height wins: errors (a neighbor cutting the shadow off, an outline set back from the roof edge) only ever shorten shadows.'),
-      h('p', { class: 'small muted' }, `Plausible noon sun here: ${s.plausible_noon_elevation.dec_solstice}° (Dec) to ${s.plausible_noon_elevation.jun_solstice}° (Jun).`))));
-
-  // Charts
-  sec.append(h('div', { class: 'grid2' },
-    h('div', {}, h('h3', {}, 'Estimated vs measured height'), scatter(v, byId, select),
-      h('p', { class: 'small muted' }, `${v.n} buildings with a clean shadow and an LA County height (reference excluded). r = ${v.pearson_r}, ${Math.round(v.within_1_5m * 100)}% within 1.5 m. ${v.note} Best-fit sun elevation from the LA County heights: ${v.best_fit_elevation_deg}° (calibrated: ${s.sun_elevation}°).`)),
-    h('div', {}, h('h3', {}, 'Finding the shadow direction'), dirChart(s),
-      h('p', { class: 'small muted' }, 'For each compass bearing: the share of pixels just outside every building outline (1.5–6 m out in that direction) that are shadow. One sun cast every shadow, so the peak is the shadow direction for the whole image.'))));
-  sec.append(h('details', {}, h('summary', {}, 'How it works, and its limits'),
-    h('ol', { class: 'small' },
-      h('li', {}, 'Shadow mask: pixels that are dark and bluish (shadows are lit only by blue skylight). Toggle "Shadow mask" above.'),
-      h('li', {}, 'Direction: the bearing where outlines shifted outward hit shadow most often (chart above).'),
-      h('li', {}, 'Length: rotate the image so shadows point right; for each row of an outline, count the dark run past its leeward edge (up to 2.5 m of lit roof allowed first, for outlines set back from the roof edge). The building’s shadow is the 80th percentile across rows.'),
-      h('li', {}, 'Calibration: tan(sun elevation) = reference height ÷ reference shadow. Height of everything else = shadow × that tan.'),
-      h('li', {}, 'Validation: LA County’s LiDAR heights (in the OpenStreetMap outlines) never feed the estimate.')),
-    h('p', { class: 'small' }, h('b', {}, 'Known limits: '), 'outlines come from an older survey, so redeveloped lots (the Lex sites themselves) have house outlines and house heights; pitched roofs cast shorter shadows than their ridge, so estimates run low on houses; shadows that land on another roof, or merge with a tree or a taller neighbor’s shadow, are flagged or inflate the estimate; the direction peak is broad (±5°) because the street grid lines buildings up north–south.')));
-  setTimeout(() => focusOn(D / 2 + 60, D / 2 + 60, 1.6), 0);
-  return sec;
-}
-
-function scatter(v, byId, onPick) {
-  const W = 520, H = 380, m = { l: 44, r: 14, t: 12, b: 38 };
-  const pts = v.points; const max = Math.min(40, Math.ceil(Math.max(...pts.map(p => Math.max(p[0], p[1]))) / 5) * 5);
-  const x = d => m.l + d / max * (W - m.l - m.r), y = d => H - m.b - Math.min(d, max) / max * (H - m.t - m.b);
-  const svg = h('svg', { class: 'chart', viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'Scatter of estimated vs LA County height' });
-  const g = h('g', { class: 'grid' });
-  for (let t = 0; t <= max; t += 5) { g.append(h('line', { x1: x(0), x2: x(max), y1: y(t), y2: y(t) })); svg.append(h('text', { x: m.l - 6, y: y(t) + 4, 'text-anchor': 'end' }, t), h('text', { x: x(t), y: H - m.b + 16, 'text-anchor': 'middle' }, t)); }
-  svg.prepend(g);
-  svg.append(h('polygon', { points: `${x(0)},${y(1.5)} ${x(max - 1.5)},${y(max)} ${x(max)},${y(max)} ${x(max)},${y(max - 1.5)} ${x(1.5)},${y(0)} ${x(0)},${y(0)}`, fill: 'var(--surface-2)', opacity: .9 }));
-  svg.append(h('line', { x1: x(0), y1: y(0), x2: x(max), y2: y(max), stroke: 'var(--muted)', 'stroke-dasharray': '5 4', 'stroke-width': 1.5 }));
-  svg.append(h('text', { x: x(max) - 4, y: y(max) + 14, 'text-anchor': 'end' }, 'perfect'));
-  svg.append(h('text', { x: (m.l + W - m.r) / 2, y: H - 4, 'text-anchor': 'middle' }, 'LA County measured height (m)'));
-  svg.append(h('text', { x: 12, y: (m.t + H - m.b) / 2, 'text-anchor': 'middle', transform: `rotate(-90 12 ${(m.t + H - m.b) / 2})` }, 'Estimated from shadow (m)'));
-  for (const [gt, est, id] of pts) {
-    const c = h('circle', { cx: x(gt), cy: y(est), r: 4.5, fill: '#2a78d6', stroke: 'var(--surface)', 'stroke-width': 2, style: 'cursor:pointer' });
-    const hit = h('circle', { cx: x(gt), cy: y(est), r: 9, fill: 'transparent', style: 'cursor:pointer',
-      onmousemove: e => { c.setAttribute('r', 6.5); showTip(e, `LA County ${gt} m · estimate ${est} m<br>error ${(est - gt).toFixed(1)} m${est > max ? ' (off chart)' : ''}<br><span style="opacity:.75">click to show on map</span>`); },
-      onmouseleave: () => { c.setAttribute('r', 4.5); hideTip(); }, onclick: () => onPick(id, 'scatter') });
-    svg.append(c, hit);
-  }
-  return svg;
-}
-
-function dirChart(s) {
-  const W = 520, H = 260, m = { l: 40, r: 14, t: 12, b: 36 };
-  const P = s.direction_profile.map(([b, v]) => [((b % 360) + 360) % 360, v]).sort((a, b) => a[0] - b[0]);
-  const max = Math.ceil(Math.max(...P.map(p => p[1])) * 10) / 10;
-  const x = d => m.l + d / 360 * (W - m.l - m.r), y = d => H - m.b - d / max * (H - m.t - m.b);
-  const svg = h('svg', { class: 'chart', viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'Shadow score by compass bearing' });
-  const g = h('g', { class: 'grid' });
-  for (let t = 0; t <= max + 1e-9; t += 0.1) { g.append(h('line', { x1: x(0), x2: x(360), y1: y(t), y2: y(t) })); svg.append(h('text', { x: m.l - 6, y: y(t) + 4, 'text-anchor': 'end' }, Math.round(t * 100) + '%')); }
-  svg.append(g);
-  [['N', 0], ['E', 90], ['S', 180], ['W', 270], ['N', 360]].forEach(([n, d]) => svg.append(h('text', { x: x(d), y: H - m.b + 16, 'text-anchor': 'middle' }, `${n} ${d}°`)));
-  svg.append(h('text', { x: (m.l + W - m.r) / 2, y: H - 4, 'text-anchor': 'middle' }, 'Direction tested (compass bearing)'));
-  svg.append(h('polyline', { points: P.map(p => `${x(p[0])},${y(p[1])}`).join(' '), fill: 'none', stroke: '#2a78d6', 'stroke-width': 2, 'stroke-linejoin': 'round' }));
-  const bx = x(((s.shadow_bearing % 360) + 360) % 360);
-  svg.append(h('line', { x1: bx, x2: bx, y1: m.t, y2: H - m.b, stroke: 'var(--ref)', 'stroke-width': 1.5, 'stroke-dasharray': '4 3' }),
-    h('text', { x: Math.min(bx + 6, W - 120), y: m.t + 12, style: 'fill:var(--ink)' }, `peak ${s.shadow_bearing}°`));
-  const cross = h('line', { y1: m.t, y2: H - m.b, stroke: 'var(--muted)', 'stroke-width': 1, style: 'display:none' });
-  const dot = h('circle', { r: 4.5, fill: '#2a78d6', stroke: 'var(--surface)', 'stroke-width': 2, style: 'display:none' });
-  svg.append(cross, dot, h('rect', { x: m.l, y: m.t, width: W - m.l - m.r, height: H - m.t - m.b, fill: 'transparent',
-    onmousemove: e => { const r = svg.getBoundingClientRect(); const bearing = ((e.clientX - r.left) / r.width * W - m.l) / (W - m.l - m.r) * 360;
-      const p = P.reduce((a, q) => Math.abs(q[0] - bearing) < Math.abs(a[0] - bearing) ? q : a);
-      cross.setAttribute('x1', x(p[0])); cross.setAttribute('x2', x(p[0])); cross.style.display = ''; dot.setAttribute('cx', x(p[0])); dot.setAttribute('cy', y(p[1])); dot.style.display = '';
-      showTip(e, `bearing ${p[0]}°: ${(p[1] * 100).toFixed(1)}% shadow`); },
-    onmouseleave: () => { cross.style.display = dot.style.display = 'none'; hideTip(); } }));
-  return svg;
 }
 
 // ------------------------------------------------------------------ Matterport
@@ -787,8 +548,7 @@ function renderDrone(b) {
   sec.append(h('div', { class: 'tiles' },
     tile('Drone photos', fmt(s.drone_photo_count, 0)), tile('Splat size', fmt(s.splatBytes / 1e6, 0) + ' MB', 'Gaussian splat (.ply)'),
     tile('All files', fmt(s.totalBytes / 1e9, 1) + ' GB'), tile('Flight', ts(s.drone_flight_start).slice(0, 10), `${ts(s.drone_flight_start).slice(11, 16)}–${ts(s.drone_flight_end).slice(11, 16)} (drone clock)`)));
-  sec.append(h('p', { class: 'small muted' }, 'The drone photos carry their own timestamps and GPS, so their shadows have a known sun position. That is a second, independent check for the 232 drone-flown models, though it is a different moment from the Vexcel photo.'),
-    rawJson('Raw catalog (without the photo list)', s));
+  sec.append(rawJson('Raw catalog (without the photo list)', s));
   return sec;
 }
 
@@ -801,7 +561,7 @@ function renderVexcel(b, base) {
       h('div', {}, kv([['Endpoint', h('code', {}, 'POST /v2/ortho/extract')], ['Layers', v.layer], ['Clip', `${v.box.half_m * 2} m square around the model`],
         ['Pixels', `${v.box.size_px} × ${v.box.size_px} (${v.box.m_per_px.toFixed(3)} m per pixel)`], ['Bounds', `${v.box.s.toFixed(5)}–${v.box.n.toFixed(5)} N, ${v.box.w.toFixed(5)}–${v.box.e.toFixed(5)} E`],
         ['Download', `${fmt(v.bytes / 1e6, 1)} MB in ${v.seconds} s`], ['Capture time', 'not returned']]),
-        h('div', { class: 'callout' }, h('p', {}, v.note + ' The shadow section recovers the sun angle from the image instead.')))));
+        h('div', { class: 'callout' }, h('p', {}, v.note)))));
 }
 
 // ------------------------------------------------------------------ CoStar
@@ -833,8 +593,7 @@ function renderCostar(b) {
   if (cs.property) sec.append(renderCommercial(cs.property), rawJson('Raw commercial property record', cs.property));
   if (cs.nearby) sec.append(h('h3', {}, 'CoStar commercial properties in the aerial clip'),
     h('div', { class: 'tablebox' }, h('table', {}, h('thead', {}, h('tr', {}, h('th', {}, 'Name'), h('th', {}, 'Address'), h('th', { class: 'num' }, 'Distance'), h('th', { class: 'num' }, 'Stories'), h('th', { class: 'num' }, 'Height ft'), h('th', { class: 'num' }, 'Year'), h('th', { class: 'num' }, 'RBA sq ft'))),
-      h('tbody', {}, cs.nearby.map(c => h('tr', {}, h('td', {}, c.name || '–'), h('td', {}, c.address), h('td', { class: 'num' }, c.distance_m + ' m'), h('td', { class: 'num' }, c.stories ?? '–'), h('td', { class: 'num' }, c.height_ft ?? '–'), h('td', { class: 'num' }, c.year_built ?? '–'), h('td', { class: 'num' }, fmt(c.rba_sf, 0))))))),
-    h('p', { class: 'small muted' }, 'Story counts are what calibrate the shadows. 3,327 of the kit’s 3,339 commercial properties have stories or a height.'));
+      h('tbody', {}, cs.nearby.map(c => h('tr', {}, h('td', {}, c.name || '–'), h('td', {}, c.address), h('td', { class: 'num' }, c.distance_m + ' m'), h('td', { class: 'num' }, c.stories ?? '–'), h('td', { class: 'num' }, c.height_ft ?? '–'), h('td', { class: 'num' }, c.year_built ?? '–'), h('td', { class: 'num' }, fmt(c.rba_sf, 0))))))));
   if (L) sec.append(rawJson('Raw residential listing', L));
   if (F) sec.append(rawJson('Raw listing features', F));
   return sec;
@@ -866,25 +625,6 @@ function renderCommercial(C) {
     h('tbody', {}, C.floors.map(f => h('tr', {}, h('td', {}, enumName('FloorName', f.floorName) || f.floorName), h('td', { class: 'num' }, fmt(f.floorSize?.squareFeet, 0))))))));
   if (photos.length) wrap.append(h('h3', {}, `Building photos (${photos.length})`), h('div', { class: 'photos' }, photos.slice(0, 24).map(x => h('img', { src: x.attachmentUri, loading: 'lazy', alt: x.caption || 'Building photo', title: x.caption || '', referrerpolicy: 'no-referrer', onerror: e => e.target.remove() }))));
   return wrap;
-}
-
-// ------------------------------------------------------------------ Outlines table
-function renderOutlines(b, s) {
-  const rows = s.buildings.slice();
-  let key = 'distance_m', dir = 1;
-  const tbody = h('tbody');
-  const cols = [['osm_id', 'OSM way'], ['distance_m', 'Distance', 1], ['area_m2', 'Footprint m²', 1], ['status', 'Status'], ['shadow_m', 'Shadow m', 1], ['est_h', 'Estimate m', 1], ['lacounty_h', 'LA County m', 1], ['err', 'Error m', 1], ['start_date', 'Built']];
-  rows.forEach(r => r.err = r.est_h != null && r.lacounty_h != null && r.status === 'ok' ? +(r.est_h - r.lacounty_h).toFixed(1) : null);
-  function fill() {
-    rows.sort((a, c) => { const x = a[key], y = c[key]; if (x == null) return 1; if (y == null) return -1; return (x > y ? 1 : x < y ? -1 : 0) * dir; });
-    tbody.replaceChildren(...rows.map(r => h('tr', { 'data-id': r.osm_id, style: 'cursor:pointer', onclick: () => STATE.selectBuilding?.(r.osm_id, 'table') },
-      ...cols.map(([k, , num]) => h('td', { class: num ? 'num' : '' }, k === 'status' && r.reference ? 'reference' : k === 'osm_id' && r.osm_id === s.target_osm_id ? r.osm_id + ' (house)' : r[k] ?? '–')))));
-  }
-  const thead = h('thead', {}, h('tr', {}, cols.map(([k, n, num]) => h('th', { class: 'sortable ' + (num ? 'num' : ''), onclick: () => { dir = key === k ? -dir : 1; key = k; fill(); } }, n))));
-  fill();
-  return h('section', { id: 'osm' }, h('h2', {}, 'Building outlines and heights'),
-    h('p', { class: 'sub' }, `${b.osm.buildings} OpenStreetMap outlines in the clip, ${b.osm.with_height} with LA County measured heights. Click a column to sort, a row to show it on the map.`),
-    h('div', { class: 'tablebox' }, h('table', { id: 'bldTable' }, thead, tbody)));
 }
 
 main().catch(e => { console.error(e); $('#app').replaceChildren(h('p', { class: 'err' }, 'Failed to load: ' + e.message)); });
