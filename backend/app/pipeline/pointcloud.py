@@ -70,14 +70,22 @@ def main():
     ap.add_argument("--model", required=True)
     ap.add_argument("--stride", type=int, default=4)
     a = ap.parse_args()
-    b = mp(Q, id=a.model)["model"]["bundle"]
-    url = b["assets"][0]["url"]
+    download_pointcloud(a.model, a.stride)
+
+
+def download_pointcloud(sid, stride=4):
+    b = mp(Q, id=sid)["model"]["bundle"]
+    url = next((asset["url"] for asset in (b or {}).get("assets", []) if asset.get("url")), None)
+    if not url:
+        raise ValueError("This scan has no downloadable MatterPak point cloud.")
     size, entries, hit = find_entry(url)
+    if hit is None:
+        raise ValueError("The MatterPak archive does not contain cloud.xyz.")
     print(f"MatterPak {size / 1e6:.0f} MB; cloud.xyz {hit[3] / 1e6:.0f} MB ({hit[2] / 1e6:.0f} MB compressed)")
-    pts = stream_cloud(url, hit, a.stride)
-    out = DATA / a.model / "cloud.npy"
+    pts = stream_cloud(url, hit, stride)
+    out = DATA / sid / "cloud.npy"
     np.save(out, pts)
-    print(f"kept {len(pts):,} points (every {a.stride}th) -> {out}; extent {np.ptp(pts[:, :3], 0).round(1)} m")
+    print(f"kept {len(pts):,} points (every {stride}th) -> {out}; extent {np.ptp(pts[:, :3], 0).round(1)} m")
 
 
 if __name__ == "__main__":

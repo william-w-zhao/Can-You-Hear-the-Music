@@ -16,6 +16,7 @@ import sys
 import time
 
 from app.pipeline.geo import Box
+from app.pipeline.cache_files import write_json
 from app.sources.config import DATA
 from app.sources.costar_kit import fetch_costar
 from app.sources.matterport import fetch_matterport, fetch_site
@@ -34,7 +35,10 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--model", default="zvKHR9DHNjJ")
     args = ap.parse_args()
-    sid = args.model
+    fetch_building(args.model)
+
+
+def fetch_building(sid):
     outdir = DATA / sid
     outdir.mkdir(parents=True, exist_ok=True)
     bundle = {"sid": sid, "fetched_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "errors": []}
@@ -51,11 +55,11 @@ def main():
             log(f"  ! {e}")
             bundle["errors"].append(str(e))
     # Keep source metadata together while storing the actual images beside the JSON.
-    (outdir / "bundle.json").write_text(json.dumps(bundle, indent=1, default=str))
+    write_json(outdir / "bundle.json", bundle)
     idx = DATA / "index.json"
     models = json.loads(idx.read_text()) if idx.exists() else {}
     models[sid] = bundle["matterport"]["basics"]["name"]
-    idx.write_text(json.dumps(models, indent=1))
+    write_json(idx, models)
     log(f"Saved {outdir}  ({len(bundle['errors'])} errors)")
 
 

@@ -18,7 +18,9 @@ uvicorn app.main:app --reload --port 8000        # http://localhost:8000/docs li
 | `prototypes/` | Local servers for the working explorer and acoustics demos |
 | `tests/` | Tests for the pipeline |
 
-The cached building, room and what-if endpoints are available in `/docs`. New-scan analysis and agent
-endpoints are still scaffolds. The pipeline scripts run as modules from `backend/`.
+The cached building, room and what-if endpoints are available in `/docs`. Use
+`POST /api/buildings/{sid}/analyse` to start a job and `GET /api/jobs/{job_id}` to check progress.
+The dashboard submits reviewed labels to `POST /api/jobs/{job_id}/materials` when the job needs them.
+Agent endpoints are still scaffolds. The pipeline scripts run as modules from `backend/`.
 To run the working demos, use `python3 -m prototypes.explorer` and `python3 -m prototypes.acoustics` in
 separate terminals with the backend environment active.

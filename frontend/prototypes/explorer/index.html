@@ -57,8 +57,6 @@ section > .sub{color:var(--muted);margin:0 0 12px}
 .tile .s{font-size:.8rem;color:var(--muted)}
 .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
 .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
-.legend{display:flex;gap:12px;flex-wrap:wrap;align-items:center;font-size:.8rem;color:var(--muted);margin-top:8px}
-.legend .sw{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:4px}
 table{border-collapse:collapse;width:100%;font-size:.86rem}
 th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
 th{font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600;background:var(--surface-2);position:sticky;top:0}
@@ -72,20 +70,14 @@ tbody tr:hover td{background:var(--surface-2)}
 details{border:1px solid var(--line);border-radius:9px;padding:8px 12px;margin-top:10px;background:var(--bg)}
 details summary{cursor:pointer;font-weight:600;font-size:.9rem}
 pre.json{max-height:420px;overflow:auto;font:12px/1.5 var(--mono);margin:8px 0 0;white-space:pre-wrap;word-break:break-word}
-.tip{position:fixed;pointer-events:none;z-index:50;background:var(--ink);color:var(--surface);padding:7px 9px;border-radius:7px;font-size:.8rem;line-height:1.4;max-width:280px;display:none;box-shadow:0 4px 14px rgba(0,0,0,.25)}
 .pano{height:380px;border-radius:10px;border:1px solid var(--line);background-repeat:repeat-x;background-size:auto 100%;cursor:grab;touch-action:none}
-.plan{position:relative;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}
-.plan img,.plan svg{display:block;width:100%;height:auto}
-.plan svg{position:absolute;inset:0;height:100%}
-.plan polygon{fill:transparent;stroke:none;cursor:pointer}
-.plan polygon:hover,.plan polygon.on{fill:rgba(57,135,229,.22)}
 .photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px}
 .photos img{width:100%;aspect-ratio:3/2;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
 .tags{display:flex;gap:6px;flex-wrap:wrap}
 .tag{font-size:.8rem;background:var(--surface-2);border-radius:6px;padding:2px 8px}
 iframe.tour{width:100%;aspect-ratio:16/9;border:1px solid var(--line);border-radius:10px;background:#000}
 .err{color:var(--critical);font-size:.88rem}
-/* Building picker + room picker */
+/* Building and scan picker */
 .shell{display:grid;grid-template-columns:330px minmax(0,1fr);max-width:1600px;margin:0 auto}
 .shell main{max-width:none;margin:0;min-width:0}
 aside.picker{position:sticky;top:var(--hdr,53px);height:calc(100vh - var(--hdr,53px));display:flex;flex-direction:column;border-right:1px solid var(--line);background:var(--surface)}
@@ -113,13 +105,6 @@ aside.picker{position:sticky;top:var(--hdr,53px);height:calc(100vh - var(--hdr,5
 .picker .more{padding:10px 12px;font-size:.8rem;color:var(--muted)}
 .rooms-chips{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 12px}
 .rooms-chips button{font-size:.82rem;padding:3px 10px;border-radius:999px}
-.plan polygon.sel{fill:rgba(250,178,25,.35);stroke:#9a5f00;stroke-width:6}
-.roomcard{border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:10px;padding:12px 14px;background:var(--bg);margin-bottom:12px}
-.roomcard h4{margin:0 0 4px;font-size:1.1rem}
-.roomcard .tiles{margin:8px 0 4px}
-.roomcard .tiles{grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:8px}
-.roomcard .tile{background:var(--surface);padding:8px 10px}
-.roomcard .tile .v{font-size:1.15rem}
 .joblog{max-height:240px;overflow:auto;font:12px/1.5 var(--mono);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;white-space:pre-wrap;margin-top:10px}
 button.primary{background:var(--ink);color:var(--surface);border-color:var(--ink);padding:7px 14px}
 button.primary:disabled{opacity:.55;cursor:default}
@@ -157,7 +142,6 @@ button.primary:disabled{opacity:.55;cursor:default}
 </aside>
 <main id="app"><p class="muted">Loading…</p></main>
 </div>
-<div class="tip" id="tip"></div>
 
 <script>
 const $ = (s, r = document) => r.querySelector(s);
@@ -178,11 +162,6 @@ function h(tag, attrs = {}, ...kids) {
 const fmt = (v, d = 1) => v == null || Number.isNaN(v) ? '–' : Number(v).toLocaleString(undefined, { maximumFractionDigits: d, minimumFractionDigits: 0 });
 const money = v => v == null ? '–' : '$' + Number(v).toLocaleString();
 const date = s => s ? new Date(s).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '–';
-const tip = $('#tip');
-function showTip(ev, html) { tip.innerHTML = html; tip.style.display = 'block';
-  const x = Math.min(ev.clientX + 14, innerWidth - tip.offsetWidth - 8), y = Math.min(ev.clientY + 14, innerHeight - tip.offsetHeight - 8);
-  tip.style.left = x + 'px'; tip.style.top = y + 'px'; }
-const hideTip = () => tip.style.display = 'none';
 function kv(pairs) { return h('dl', { class: 'kv' }, pairs.filter(p => p).flatMap(([k, v]) => [h('dt', {}, k), h('dd', {}, v ?? '–')])); }
 function tile(k, v, s, extra = {}) { return h('div', { class: 'tile', ...extra }, h('div', { class: 'k' }, k), h('div', { class: 'v' }, v), s ? h('div', { class: 's' }, s) : null); }
 function rawJson(title, obj) { return h('details', {}, h('summary', {}, title), h('pre', { class: 'json' }, JSON.stringify(obj, null, 1))); }
@@ -272,7 +251,7 @@ async function main() {
   initPicker();
   const first = params().get('m') || CATALOG.find(r => r.cached)?.sid || CATALOG[0]?.sid;
   renderList();
-  if (first) selectBuilding(first, { push: false, room: params().get('room') });
+  if (first) selectBuilding(first, { push: false });
 }
 
 // The scans (suites / units) of the current building, so you can switch between them.
@@ -296,7 +275,7 @@ function scansBar(sid) {
     wrap);
 }
 
-async function selectBuilding(sid, { push = true, room = null } = {}) {
+async function selectBuilding(sid, { push = true } = {}) {
   CURRENT = sid;
   const row = BY_SID[sid];
   if (push) history.pushState(null, '', '?m=' + sid);
@@ -307,7 +286,7 @@ async function selectBuilding(sid, { push = true, room = null } = {}) {
   app.replaceChildren(h('p', { class: 'muted' }, 'Loading…'));
   window.scrollTo({ top: 0 });
   try {
-    if (row?.cached) await renderFull(sid, room);
+    if (row?.cached) await renderFull(sid);
     else await renderKitOnly(sid, row);
     const bar = CURRENT === sid && scansBar(sid);
     if (bar) app.insertBefore(bar, app.children[1] || null);
@@ -360,16 +339,15 @@ async function startFetch(sid, btn, box) {
 }
 
 // A building with everything downloaded: the full explorer.
-async function renderFull(sid, room) {
+async function renderFull(sid) {
   const base = `data/${sid}/`;
   const bundle = await fetch(base + 'bundle.json').then(r => r.json());
   if (CURRENT !== sid) return;
-  setNav([['#rooms', 'Rooms'], ['#matterport', 'Matterport'], ['#drone', 'Drone & splat'],
+  setNav([['#matterport', 'Matterport'], ['#drone', 'Drone & splat'],
     ['#vexcel', 'Vexcel'], ['#costar', 'CoStar']]);
   const app = $('#app');
   app.replaceChildren(
     guard('Overview', () => renderHero(bundle, base)),
-    guard('Rooms', () => renderRooms(bundle, base, room)),
     guard('Matterport', () => renderMatterport(bundle, base)),
     guard('Drone & splat', () => renderDrone(bundle)),
     guard('Vexcel', () => renderVexcel(bundle, base)),
@@ -426,116 +404,15 @@ function renderMatterport(b, base) {
       h('div', { class: 'toolbar' }, bF, pano.defurnished_file ? bD : null, h('span', { class: 'muted small' }, `Drag to look around · camera at (${pano.position.x.toFixed(2)}, ${pano.position.y.toFixed(2)}, ${pano.position.z.toFixed(2)}) m`)), box);
   }
 
-  sec.append(h('p', { class: 'small' }, 'Floor plan, rooms and walls are in the ', h('a', { href: '#rooms' }, 'Rooms'), ' section above.'));
+  sec.append(h('p', { class: 'small' }, h('a', {
+    href: 'http://localhost:5173/b/' + encodeURIComponent(b.sid),
+  }, 'Open the room picker ↗')));
 
   // 3D tour
   const frame = h('iframe', { class: 'tour', title: 'Matterport 3D tour', allow: 'xr-spatial-tracking; fullscreen' });
   const load = h('button', { onclick: () => { frame.src = `https://my.matterport.com/show/?m=${b.sid}&play=1&qs=1${window.MP_SDK_KEY ? '&applicationKey=' + encodeURIComponent(window.MP_SDK_KEY) : ''}`; load.remove(); } }, 'Load the 3D tour');
   sec.append(h('h3', {}, '3D tour'), load, frame);
   sec.append(rawJson('Raw Matterport basics', m), rawJson('Raw rooms', M.rooms));
-  return sec;
-}
-
-// ------------------------------------------------------------------ Rooms
-function polyArea(pts) { let a = 0; for (let i = 0; i < pts.length; i++) { const [x1, y1] = pts[i], [x2, y2] = pts[(i + 1) % pts.length]; a += x1 * y2 - x2 * y1; } return Math.abs(a) / 2; }
-function polyPerim(pts) { let p = 0; for (let i = 0; i < pts.length; i++) { const [x1, y1] = pts[i], [x2, y2] = pts[(i + 1) % pts.length]; p += Math.hypot(x2 - x1, y2 - y1); } return p; }
-function inPoly([x, y], pts) { let c = false; for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) { const [xi, yi] = pts[i], [xj, yj] = pts[j];
-  if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; }
-function distToPoly([x, y], pts) { let best = Infinity; for (let i = 0; i < pts.length; i++) { const [ax, ay] = pts[i], [bx, by] = pts[(i + 1) % pts.length];
-  const dx = bx - ax, dy = by - ay, L = dx * dx + dy * dy, t = L ? Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / L)) : 0;
-  best = Math.min(best, Math.hypot(x - ax - t * dx, y - ay - t * dy)); } return best; }
-const M2_TO_FT2 = 10.7639;
-
-function renderRooms(b, base, initialRoom) {
-  const M = b.matterport;
-  const sec = h('section', { id: 'rooms' }, h('h2', {}, 'Rooms'),
-    h('p', { class: 'sub' }, 'Pick a room on the plan, in the list or in the table to see everything the scan knows about it.'));
-  // Name each room; repeat labels get a number (Bedroom 1, Bedroom 2).
-  const rooms = M.rooms.filter(r => r.label !== 'Void');
-  const seen = {}, totals = {};
-  rooms.forEach(r => { const l = r.label || 'Unlabelled'; totals[l] = (totals[l] || 0) + 1; });
-  rooms.forEach(r => { const l = r.label || 'Unlabelled'; seen[l] = (seen[l] || 0) + 1; r._name = totals[l] > 1 ? `${l} ${seen[l]}` : l; });
-  rooms.sort((a, c) => (c.dimensions?.areaFloor || 0) - (a.dimensions?.areaFloor || 0));
-  const labelledArea = rooms.reduce((a, r) => a + (r.label ? r.dimensions?.areaFloor || 0 : 0), 0);
-  const floorName = id => M.floors.find(f => f.id === id)?.label || '–';
-  if (!rooms.length) { sec.append(h('p', { class: 'muted' }, 'The scan has no room segmentation.')); return sec; }
-
-  const card = h('div', { class: 'roomcard', 'aria-live': 'polite' });
-  const chips = h('div', { class: 'rooms-chips', role: 'group', 'aria-label': 'Rooms' });
-  const polyById = {}, rowById = {}, chipById = {};
-  let current = null;
-
-  function describe(r) {
-    const d = r.dimensions || {}, poly = r.polygon?.length > 2 ? r.polygon : null;
-    const panos = poly ? M.panos.filter(p => inPoly([p.position.x, p.position.y], poly)) : [];
-    const walls = poly ? M.walls.filter(w => w.floor === r.floor && distToPoly(w.a, poly) < 0.25 && distToPoly(w.b, poly) < 0.25) : [];
-    const wallLen = walls.reduce((a, w) => a + Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]), 0);
-    const share = r.label && labelledArea ? (d.areaFloor || 0) / labelledArea : null;
-    const shownPano = M.pano && panos.some(p => p.id === M.pano.id);
-    card.replaceChildren(
-      h('div', { class: 'muted small mono' }, `room ${r.id} · ${floorName(r.floor)}`),
-      h('h4', {}, r._name),
-      h('div', { class: 'tiles' },
-        tile('Floor area', `${fmt(d.areaFloor)} m²`, `${fmt((d.areaFloor || 0) * M2_TO_FT2, 0)} sq ft${share != null ? ` · ${fmt(share * 100, 0)}% of labelled area` : ''}`),
-        tile('Width × depth', d.width ? `${fmt(d.width, 2)} × ${d.depth ? fmt(d.depth, 2) : '–'} m` : '–', 'bounding dimensions from Matterport'),
-        tile('Ceiling', d.height ? `${fmt(d.height, 2)} m` : '–', d.height ? `volume ≈ ${fmt((d.areaFloor || 0) * d.height, 0)} m³` : 'not measured'),
-        tile('Perimeter', poly ? `${fmt(polyPerim(poly), 1)} m` : '–', poly ? `${walls.length} wall segments · ${fmt(wallLen, 1)} m of wall` : 'no outline in the scan'),
-        tile('Scan positions', panos.length, panos.length ? 'panos ' + panos.map(p => p.label).join(', ') : 'none inside the outline')),
-      h('p', { class: 'small muted' }, [
-        poly ? `Outline: ${poly.length} corners, ${fmt(polyArea(poly), 1)} m² by polygon.` : 'This segment has no outline, so it cannot be drawn on the plan.',
-        shownPano ? ' The panorama in the Matterport section was taken in this room.' : '',
-        ' Windows and light are not in the room data yet.'].join('')));
-  }
-
-  function select(id, { scroll = false } = {}) {
-    const r = rooms.find(x => x.id === id); if (!r) return;
-    current = id;
-    Object.entries(polyById).forEach(([k, p]) => p.classList.toggle('sel', k === id));
-    Object.entries(rowById).forEach(([k, tr]) => tr.classList.toggle('sel', k === id));
-    Object.entries(chipById).forEach(([k, c]) => c.setAttribute('aria-pressed', k === id ? 'true' : 'false'));
-    describe(r);
-    const u = new URL(location); u.searchParams.set('room', id); history.replaceState(null, '', u);
-    if (scroll) rowById[id]?.scrollIntoView({ block: 'nearest' });
-  }
-
-  rooms.forEach(r => { chipById[r.id] = h('button', { 'aria-pressed': 'false', onclick: () => select(r.id, { scroll: true }) }, r._name); chips.append(chipById[r.id]); });
-
-  const tbody = h('tbody');
-  for (const r of rooms) {
-    const d = r.dimensions || {};
-    rowById[r.id] = h('tr', { style: 'cursor:pointer', onclick: () => select(r.id),
-        onmouseenter: () => polyById[r.id]?.classList.add('on'), onmouseleave: () => polyById[r.id]?.classList.remove('on') },
-      h('td', {}, r._name), h('td', { class: 'num' }, fmt(d.areaFloor)), h('td', { class: 'num' }, fmt(d.width, 2)), h('td', { class: 'num' }, fmt(d.depth, 2)), h('td', { class: 'num' }, fmt(d.height, 2)));
-    tbody.append(rowById[r.id]);
-  }
-  const table = h('div', { class: 'tablebox' }, h('table', {}, h('thead', {}, h('tr', {}, h('th', {}, 'Room'), h('th', { class: 'num' }, 'Area m²'), h('th', { class: 'num' }, 'Width'), h('th', { class: 'num' }, 'Depth'), h('th', { class: 'num' }, 'Ceiling'))), tbody));
-
-  const fp = M.floorplans.find(f => f.flags.length === 1) || M.floorplans[0];
-  let planBox = h('p', { class: 'muted' }, 'No floor plan image for this scan.');
-  if (fp) {
-    const tx = x => (x - fp.origin.x) * fp.resolution, ty = y => fp.height - (y - fp.origin.y) * fp.resolution;
-    const svg = h('svg', { viewBox: `0 0 ${fp.width} ${fp.height}` });
-    for (const w of M.walls) svg.append(h('line', { x1: tx(w.a[0]), y1: ty(w.a[1]), x2: tx(w.b[0]), y2: ty(w.b[1]), stroke: '#eb6834', 'stroke-width': 9, 'stroke-linecap': 'round', opacity: .9 }));
-    for (const r of rooms) {
-      if (!(r.polygon?.length > 2)) continue;
-      const d = r.dimensions || {};
-      const text = `${r._name} · ${fmt(d.areaFloor)} m²${d.width ? ` · ${fmt(d.width, 2)} × ${fmt(d.depth, 2)} m` : ''}${d.height ? ` · ceiling ${fmt(d.height, 2)} m` : ''}`;
-      const p = h('polygon', { points: r.polygon.map(([x, y]) => `${tx(x)},${ty(y)}`).join(' '), tabindex: 0, role: 'button', 'aria-label': r._name,
-        onclick: () => select(r.id, { scroll: true }), onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(r.id, { scroll: true }); } },
-        onmousemove: e => { showTip(e, text); p.classList.add('on'); }, onmouseleave: () => { hideTip(); p.classList.remove('on'); } });
-      polyById[r.id] = p; svg.append(p);
-      const cx = r.polygon.reduce((a, q) => a + q[0], 0) / r.polygon.length, cy = r.polygon.reduce((a, q) => a + q[1], 0) / r.polygon.length;
-      if ((d.areaFloor || 0) > 4) svg.append(h('text', { x: tx(cx), y: ty(cy), 'text-anchor': 'middle', 'font-size': 34, 'font-weight': 600, fill: '#121a2b', 'pointer-events': 'none' }, r._name));
-    }
-    for (const p of M.panos) svg.append(h('circle', { cx: tx(p.position.x), cy: ty(p.position.y), r: p.id === M.pano?.id ? 16 : 9, fill: p.id === M.pano?.id ? 'none' : '#2a78d6', stroke: p.id === M.pano?.id ? '#6250d6' : '#fff', 'stroke-width': p.id === M.pano?.id ? 6 : 3, 'pointer-events': 'none' }));
-    planBox = h('div', {}, h('div', { class: 'plan' }, h('img', { src: base + fp.file, alt: 'Matterport floor plan' }), svg),
-      h('div', { class: 'legend' }, h('span', {}, h('span', { class: 'sw', style: 'background:#eb6834' }), 'walls (graph)'),
-        h('span', {}, h('span', { class: 'sw', style: 'background:#2a78d6;border-radius:50%' }), 'scan positions'),
-        h('span', {}, h('span', { class: 'sw', style: 'border:2px solid #6250d6;border-radius:50%' }), 'panorama in the Matterport section'),
-        h('span', {}, h('span', { class: 'sw', style: 'background:rgba(250,178,25,.5);border:1px solid #9a5f00' }), 'selected room')));
-  }
-  sec.append(chips, h('div', { class: 'grid2' }, planBox, h('div', {}, card, table)));
-  select(rooms.some(r => r.id === initialRoom) ? initialRoom : (rooms.find(r => r.label && r.polygon?.length > 2) || rooms[0]).id);
   return sec;
 }
 

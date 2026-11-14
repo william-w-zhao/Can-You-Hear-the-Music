@@ -4,6 +4,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, HTTPException
 
 from app.api.cache import read_scan_file, scan_directory
+from app.api.jobs import latest_job, start_job
 from app.sources import costar_kit
 from app.sources.config import DATA, KIT
 
@@ -34,6 +35,10 @@ def list_buildings():
     for sid in analysed - rows.keys():
         rows[sid] = {"sid": sid}
     summaries = [{**row, "analysed": sid in analysed} for sid, row in rows.items()]
+    for summary in summaries:
+        sid = summary["sid"]
+        if sid in analysed and (DATA / sid / "preview.jpg").is_file():
+            summary["preview_url"] = f"/data/{quote(sid, safe='')}/preview.jpg"
     return sorted(summaries, key=lambda row: (not row["analysed"], row.get("address", ""), row["sid"]))
 
 
@@ -51,13 +56,17 @@ def get_building(sid: str):
         name = bundle.get("matterport", {}).get("basics", {}).get("name")
         if name:
             summary["name"] = name
+    job = latest_job(sid)
+    if job:
+        summary["analysis_job_id"] = job["job_id"]
     return summary
 
 
-@router.post("/{sid}/analyse")
+@router.post("/{sid}/analyse", status_code=202)
 def analyse_building(sid: str):
-    """Start a background job: fetch -> point cloud -> rooms -> materials -> acoustics. Returns a job id (see jobs.py)."""
-    raise HTTPException(501, "Not implemented yet: analyse_building")
+    """Start or resume background analysis for this scan."""
+    get_building(sid)  # Validate the scan before scheduling work.
+    return {"job_id": start_job(sid)}
 
 
 @router.get("/{sid}/rooms")

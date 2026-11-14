@@ -22,6 +22,7 @@ from PIL import Image, ImageDraw
 from scipy import ndimage
 from skimage import measure
 
+from app.pipeline.cache_files import write_json
 from app.sources.config import DATA
 from app.sources.matterport import mp
 
@@ -42,6 +43,11 @@ def main():
     if a.source == "matterport":
         rooms, fp, method = rooms_from_matterport(bundle)
         return finish(a.model, d, rooms, fp, method, None, None)
+    rooms, fp, method, floor_z, ceil_z = rooms_from_cloud(d, bundle)
+    return finish(a.model, d, rooms, fp, method, floor_z, ceil_z)
+
+
+def rooms_from_cloud(d, bundle):
     P = np.load(d / "cloud.npy")
     x, y, z = P[:, 0], P[:, 1], P[:, 2]
 
@@ -76,7 +82,7 @@ def main():
         r, cc = int((p["position"]["y"] - y0) / RES), int((p["position"]["x"] - x0) / RES)
         if 0 <= r < H and 0 <= cc < W and lab[r, cc]:
             pano_room.setdefault(int(lab[r, cc]), []).append(p)
-    fp = next(f for f in bundle["matterport"]["floorplans"] if f["flags"] == ["photogramy"])
+    fp = select_floorplan(bundle["matterport"])
     to_px = lambda X, Y: [round((X - fp["origin"]["x"]) * fp["resolution"], 1), round(fp["height"] - (Y - fp["origin"]["y"]) * fp["resolution"], 1)]
 
     outside = ~interior
@@ -107,20 +113,27 @@ def main():
             "center_px": to_px(x0 + (cx + 0.5) * RES, y0 + (cy + 0.5) * RES),
         })
     method = "point-cloud wall slice; doorways bridged up to %.1f m; rooms must contain a scan position" % DOOR_M
-    return finish(a.model, d, rooms, fp, method, floor_z, ceil_z)
+    return rooms, fp, method, floor_z, ceil_z
+
+
+def select_floorplan(scan):
+    plans = scan["floorplans"]
+    if not plans:
+        raise ValueError("Matterport did not provide a floor plan for this scan.")
+    return next((plan for plan in plans if plan["flags"] == ["photogramy"]), plans[0])
 
 
 def rooms_from_matterport(bundle):
     """Rooms straight from Matterport's room outlines and dimensions (scans that have a wall graph)."""
     M = bundle["matterport"]
-    fp = next(f for f in M["floorplans"] if f["flags"] == ["photogramy"])
+    fp = select_floorplan(M)
     to_px = lambda X, Y: [round((X - fp["origin"]["x"]) * fp["resolution"], 1), round(fp["height"] - (Y - fp["origin"]["y"]) * fp["resolution"], 1)]
     heights = [r["dimensions"]["height"] for r in M["rooms"] if (r.get("dimensions") or {}).get("height")]
     default_h = float(np.median(heights)) if heights else 2.6
     rooms = []
     for r in M["rooms"]:
         poly, dims = r.get("polygon"), r.get("dimensions") or {}
-        if not poly or r.get("label") in (None, "Void") or (dims.get("areaFloor") or 0) < 2:
+        if not poly or r.get("label") == "Void" or (dims.get("areaFloor") or 0) < 2:
             continue
         path = measure.points_in_poly
         ps = [p for p in M["panos"] if path([[p["position"]["x"], p["position"]["y"]]], poly)[0]]
@@ -141,23 +154,28 @@ def rooms_from_matterport(bundle):
 
 
 def finish(sid, d, rooms, fp, method, floor_z, ceil_z):
+    if not rooms:
+        raise ValueError("No usable rooms were found in this scan.")
     print(f"{len(rooms)} rooms: " + ", ".join(f"{r['id']} {r.get('matterport_label', '')} {r['area_m2']} m² ({len(r['panos'])} panos)" for r in rooms))
-    a = argparse.Namespace(model=sid)
 
     # Contact sheet: for each room, its first panorama's ceiling, floor and four walls, for material labelling.
-    sky = {p["id"]: p["skybox"]["children"] for p in mp(Q_SKY, id=a.model)["model"]["panoLocations"]}
+    sky = {p["id"]: (p.get("skybox") or {}).get("children") for p in mp(Q_SKY, id=sid)["model"]["panoLocations"]}
     t = 200
     sheet = Image.new("RGB", (t * 6 + 70, t * len(rooms)), "white")
     dr = ImageDraw.Draw(sheet)
     for i, r in enumerate(rooms):
-        faces = sky[r["panos"][0]]
+        faces = next((sky.get(pano) for pano in r["panos"] if len(sky.get(pano) or []) == 6), None)
+        r["panorama_available"] = bool(faces)
+        if not faces:
+            dr.text((75, i * t + t // 2), "Panorama unavailable", fill="black")
+            continue
         for j, fi in enumerate([0, 5, 1, 2, 3, 4]):
             im = Image.open(io.BytesIO(requests.get(faces[fi], timeout=60).content)).convert("RGB").resize((t, t))
             sheet.paste(im, (70 + j * t, i * t))
         dr.text((6, i * t + t // 2 - 6), r["id"], fill="black")
     sheet.save(d / "room_sheet.jpg", quality=80)
-    out = {"model": a.model, "floor_z": floor_z, "ceiling_z": ceil_z, "floorplan": fp, "rooms": rooms, "method": method}
-    (d / "rooms.json").write_text(json.dumps(out, indent=1))
+    out = {"model": sid, "floor_z": floor_z, "ceiling_z": ceil_z, "floorplan": fp, "rooms": rooms, "method": method}
+    write_json(d / "rooms.json", out)
     print(f"Saved {d / 'rooms.json'} and room_sheet.jpg (columns: ceiling, floor, 4 walls)")
 
 

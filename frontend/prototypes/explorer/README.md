@@ -16,9 +16,8 @@ The page lists **every building in the kit** (5,099 buildings, 14,933 Matterport
 sidebar: filter by residential/commercial and city, and sort by price, size, stories or year. Pick a building to
 see its CoStar records at once. A building with several scans (suites or units) gets a scan picker. Scans
 that are not downloaded yet have a **Download scan, rooms & aerial data** button, which runs the building download
-for that model. Once a scan is downloaded, the **Rooms** section lets you pick any room on the plan, in
-the chips or in the table to see its area, dimensions, ceiling, perimeter, walls and scan positions.
-`?m=<sid>&room=<id>` links straight to a building and room.
+for that model. Open the [React app](http://localhost:5173) to pick an analysed building and a room from
+its floor plan or room list. In this explorer, `?m=<sid>` opens a specific scan.
 
 Use `--model <sid>` on the download command for another model (any id in the kit CSVs). Keys come from
 `<project>/.env` or `key-check/.env`. Needs `requests numpy pillow`.

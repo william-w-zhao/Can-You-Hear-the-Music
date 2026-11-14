@@ -119,7 +119,11 @@ Rule: **the agent decides, the code computes.** Every number the agent states co
 
 ## Run
 
-The target app serves cached scans. New-scan analysis and agent routes are still scaffolds.
+To analyse a single-floor scan, clear **Rooms available only**, open a building, and select
+**Analyse building**. The page shows the current stage and opens the room picker when results are ready.
+With `ANTHROPIC_API_KEY` set, the pipeline can suggest labels from the room panoramas.
+Use the review form to complete missing or uncertain labels. It also works without a Claude key.
+Completed files are reused on retry. The job status lives in the current backend process.
 
 ```bash
 cd backend && python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt && uvicorn app.main:app --reload --port 8000
