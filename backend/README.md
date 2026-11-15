@@ -12,18 +12,16 @@ uvicorn app.main:app --reload --port 8000        # http://localhost:8000/docs li
 | Folder | What goes there |
 |---|---|
 | `app/api/` | HTTP routes. Thin: check input, call `sources/` or `pipeline/`, return JSON |
-| `app/sources/` | Keys and paths (`config.py`), Matterport, Vexcel, the CoStar kit |
+| `app/sources/` | Keys and paths (`config.py`), Matterport, Vexcel, the CoStar kit, OpenStreetMap, traffic counts |
 | `app/pipeline/` | The computation: plain functions that read and write `data/<sid>/` |
 | `app/agent/` | The deepagents agent, its sub-agents, and tools that wrap `pipeline/` |
-| `prototypes/` | Local servers for the working explorer and acoustics demos |
 | `tests/` | Tests for the pipeline |
 
-The cached building, room and what-if endpoints are available in `/docs`. Use
-`POST /api/buildings/{sid}/analyse` to start a job and `GET /api/jobs/{job_id}` to check progress.
-The dashboard submits reviewed labels to `POST /api/jobs/{job_id}/materials` when the job needs them.
-Agent endpoints are still scaffolds. The pipeline scripts run as modules from `backend/`.
-To run the working demos, use `python3 -m prototypes.explorer` and `python3 -m prototypes.acoustics` in
-separate terminals with the backend environment active.
+Every route is listed in `/docs`; the root README summarises them. Use `POST /api/buildings/{sid}/analyse`
+to start a job, `GET /api/jobs/{job_id}` to check progress, and `POST /api/buildings/{sid}/materials` to save
+reviewed labels (this works even if a restart forgot the job). Pipeline modules also run as scripts from
+`backend/`, for example `python -m app.pipeline.vision --model <sid> --refresh` or
+`python -m app.sources.traffic <sid>`.
 
 ## Compare predicted and measured reverberation
 

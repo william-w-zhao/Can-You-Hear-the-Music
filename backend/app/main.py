@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.api import acoustics, agent, buildings, jobs, rooms
+from app.api import acoustics, agent, buildings, jobs
 from app.sources.config import DATA
 
 app = FastAPI(title="Can You Hear the Music", version="0.1.0")
@@ -24,8 +24,6 @@ app.add_middleware(
 
 app.include_router(buildings.router, prefix="/api/buildings", tags=["buildings"])
 app.include_router(acoustics.cached_router, prefix="/api/buildings")
-app.include_router(rooms.router, prefix="/api/rooms", tags=["rooms"])
-app.include_router(acoustics.router, prefix="/api/acoustics", tags=["acoustics"])
 app.include_router(jobs.router, prefix="/api/jobs", tags=["jobs"])
 app.include_router(agent.router, prefix="/api/agent", tags=["agent"])
 

@@ -8,7 +8,6 @@ from fastapi import APIRouter, HTTPException
 
 from app.pipeline.analyse_building import analyse_building
 from app.pipeline.cache_files import write_json
-from app.pipeline.materials import RoomMaterials
 from app.sources.config import DATA
 
 router = APIRouter()
@@ -87,15 +86,3 @@ def save_materials(sid, materials, room_ids):
         jobs[job_id].update(status="running", message="Calculating room echo times", review=None)
         worker.submit(run_job, job_id, sid)
     return {"job_id": job_id}
-
-
-@router.post("/{job_id}/materials")
-def submit_materials(job_id: str, materials: dict[str, RoomMaterials]):
-    with lock:
-        job = jobs.get(job_id)
-        if job is None:
-            raise HTTPException(404, "Analysis job not found. Reload the page and save again.")
-        if job["status"] != "needs_materials":
-            raise HTTPException(409, "This job is no longer waiting for material labels.")
-        sid, room_ids = job["sid"], [room["id"] for room in job["review"]["rooms"]]
-    return save_materials(sid, materials, room_ids)

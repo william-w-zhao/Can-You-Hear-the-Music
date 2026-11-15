@@ -25,7 +25,7 @@ For older responses without image evidence, the fallback room gallery reads `/da
 
 Cached reads require no browser API credentials. Matterport, Vexcel and other service keys stay on the backend. Requests use relative `/api/buildings/{sid}/rooms/...` URLs; Vite proxies `/api` and `/data` to port 8000. The frontend serves `/audio/voice.wav` from `public/audio/` when the API reports a voice clip. Never add service keys to frontend environment variables or requests.
 
-Loading/error/retry states, cancellation during navigation, malformed acoustic-response checks and non-negative glass-area validation are included. Building analysis, room review and object matching use the shared application's existing endpoints. The prototypes remain available.
+Loading/error/retry states, cancellation during navigation, malformed acoustic-response checks and non-negative glass-area validation are included. Building analysis, room review and object matching use the shared application's existing endpoints.
 
 ## Checks
 

@@ -2,20 +2,27 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "explorer",
-      "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "prototypes.explorer"],
+      "name": "backend",
+      "runtimeExecutable": ".venv/bin/python",
+      "runtimeArgs": [
+        "-m",
+        "uvicorn",
+        "app.main:app",
+        "--port",
+        "8000"
+      ],
       "cwd": "backend",
-      "env": { "PORT": "8765" },
-      "port": 8765
+      "port": 8000
     },
     {
-      "name": "acoustics",
-      "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "prototypes.acoustics"],
-      "cwd": "backend",
-      "env": { "PORT": "8766" },
-      "port": 8766
+      "name": "frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "cwd": "frontend",
+      "port": 5173
     }
   ]
 }

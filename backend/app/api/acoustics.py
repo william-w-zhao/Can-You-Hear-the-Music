@@ -21,7 +21,6 @@ from app.pipeline.vision import FACE_ORDER, SHEET_MARGIN, VIEWS
 from app.sources.config import AUDIO
 from app.sources.review_model import resolve_review_model
 
-router = APIRouter()
 cached_router = APIRouter(prefix="/{sid}/rooms/{room_id}/acoustics", tags=["acoustics"])
 review_lock = Lock()
 
@@ -494,8 +493,3 @@ def what_if(sid: str, room_id: str, overrides: MaterialOverrides):
         raise HTTPException(422, str(exc)) from exc
     return {**scenario, **metrics}
 
-
-@router.get("/{room_id}/render.wav")
-def render_wav(room_id: str):
-    """Optional: a rendered WAV of the voice in this room (for reports or the agent)."""
-    raise HTTPException(501, "Not implemented yet: render_wav")

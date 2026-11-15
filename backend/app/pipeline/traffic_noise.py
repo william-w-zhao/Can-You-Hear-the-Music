@@ -14,9 +14,9 @@ Indoors, sound passes through the room's exterior wall and windows (EN 12354-3 s
     L_in = L_out − R' + 10·log10(S / A),
 
 with S the exterior facade area, A the room's absorption at 500 Hz, and R' the combined insulation of wall and glass.
-We do not know which wall faces the road, so a room with windows is assumed to have one exterior wall facing the
-traffic (the worst case). Rooms without windows are treated as interior rooms behind one more wall.
-All results are estimates, and the page says so.
+Each outside wall comes from the floor plan (facades.py) with its own distance and direction to every road; wall and
+window insulation come from photos of the outside (exterior.py). Without that geometry, a room with windows is
+assumed to have one outside wall facing the traffic (the worst case). All results are estimates, and the page says so.
 """
 import math
 import re
@@ -129,8 +129,6 @@ def facing_reduction(cosine):
 
 def wall_outdoor(wall, roads_xy, roads):
     """Hourly outdoor level at one outside wall, from each road's distance and direction."""
-    from app.sources.traffic import segment_distance
-
     mx, my = wall["east_north"]
     nx, ny = wall["facing"]
     per_road = []
