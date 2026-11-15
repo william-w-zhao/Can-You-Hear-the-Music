@@ -122,6 +122,7 @@ def select_floorplan(scan):
 
 def rooms_from_matterport(bundle):
     """Rooms straight from Matterport's room outlines and dimensions (scans that have a wall graph)."""
+    OUTDOOR = ("patio", "porch", "deck", "balcony", "yard", "terrace", "exterior", "outdoor")
     M = bundle["matterport"]
     fp = select_floorplan(M)
     to_px = lambda X, Y: [round((X - fp["origin"]["x"]) * fp["resolution"], 1), round(fp["height"] - (Y - fp["origin"]["y"]) * fp["resolution"], 1)]
@@ -130,7 +131,12 @@ def rooms_from_matterport(bundle):
     rooms = []
     for r in M["rooms"]:
         poly, dims = r.get("polygon"), r.get("dimensions") or {}
-        if not poly or r.get("label") == "Void" or (dims.get("areaFloor") or 0) < 2:
+        if not poly or r.get("label") == "Void" or any(word in (r.get("label") or "").lower() for word in OUTDOOR):
+            continue
+        # Matterport sometimes leaves dimensions empty (a Kitchen was missing this way); the outline still gives the area.
+        outline_area = abs(sum(x0 * y1 - x1 * y0 for (x0, y0), (x1, y1) in zip(poly, poly[1:] + poly[:1]))) / 2
+        area = dims.get("areaFloor") or outline_area
+        if area < 2:
             continue
         path = measure.points_in_poly
         ps = [p for p in M["panos"] if path([[p["position"]["x"], p["position"]["y"]]], poly)[0]]
@@ -139,9 +145,10 @@ def rooms_from_matterport(bundle):
         hgt = dims.get("height") or default_h
         perim = sum(float(np.hypot(x1 - x0, y1 - y0)) for (x0, y0), (x1, y1) in zip(poly, poly[1:] + poly[:1]))
         cx, cy = np.mean(poly, axis=0)
-        rooms.append({"id": f"r{len(rooms) + 1}", "matterport_label": r["label"], "area_m2": round(dims["areaFloor"], 1),
+        rooms.append({"id": f"r{len(rooms) + 1}", "matterport_label": r["label"], "area_m2": round(area, 1),
+                      "area_source": "Matterport dimensions" if dims.get("areaFloor") else "room outline",
                       "height_m": round(hgt, 2), "height_measured": bool(dims.get("height")),
-                      "volume_m3": round(dims["areaFloor"] * hgt, 1), "perimeter_m": round(perim, 1), "window_len_m": None,
+                      "volume_m3": round(area * hgt, 1), "perimeter_m": round(perim, 1), "window_len_m": None,
                       "panos": [p["id"] for p in ps], "pano_labels": [p["label"] for p in ps],
                       "polygon_px": [to_px(x, y) for x, y in poly], "center_px": to_px(cx, cy)})
     rooms.sort(key=lambda r: -r["area_m2"])

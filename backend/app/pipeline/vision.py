@@ -142,7 +142,8 @@ def inspect_rooms(directory, rooms, report):
                         continue
                     if hit["label"] in LABEL_REVIEW_BELOW:
                         hit = {**hit, "needs_review": hit["confidence"] < LABEL_REVIEW_BELOW[hit["label"]]}
-                    name = names.get(room["id"], "").lower()
+                    # Saved labels win; on a first run Matterport's own room label is the name we have.
+                    name = (names.get(room["id"]) or room.get("matterport_label") or "").lower()
                     if hit["label"] in BATH_FIXTURES and name and not any(word in name for word in BATH_WORDS):
                         hit = {**hit, "needs_review": True}     # a toilet in an office is usually a bin or chair
                     if hit["label"] in ALWAYS_REVIEW:
