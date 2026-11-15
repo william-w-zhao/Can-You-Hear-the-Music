@@ -2,173 +2,193 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api, type BuildingSummary } from "../api";
 import { useRequest } from "../useRequest";
+import BannerWaves from "../components/BannerWaves";
 import { LoadingBlock } from "../components/Spinner";
 
 const PAGE_SIZE = 24;
 const loadBuildings = () => api.buildings();
 
-// Sound filling a room: a source with echo rings spreading out, and a level meter below.
-function HeroArt() {
+// ---------------------------------------------------------------- catalog state
+
+function useCatalog(buildings: BuildingSummary[]) {
+  const [query, setQuery] = useState("");
+  const [readyOnly, setReadyOnly] = useState(true);
+  const [kind, setKind] = useState("");
+  const [city, setCity] = useState("");
+  const [limit, setLimit] = useState(PAGE_SIZE);
+  const search = query.trim().toLowerCase();
+  const matches = buildings.filter((building) =>
+    (!readyOnly || building.analysed) && (!kind || building.kind === kind) && (!city || building.city === city) &&
+    [building.name, building.address, building.city, building.state, building.sid]
+      .some((value) => value?.toLowerCase().includes(search)),
+  );
+  const reset = <T,>(set: (value: T) => void) => (value: T) => { set(value); setLimit(PAGE_SIZE); };
+  return {
+    query, setQuery: reset(setQuery), readyOnly, setReadyOnly: reset(setReadyOnly),
+    kind, setKind: reset(setKind), city, setCity: reset(setCity),
+    matches, shown: matches.slice(0, limit), more: limit < matches.length, showMore: () => setLimit(limit + PAGE_SIZE),
+  };
+}
+type Catalog = ReturnType<typeof useCatalog>;
+
+function describe(building: BuildingSummary) {
+  const title = building.name || building.address || building.sid;
+  const city = [building.city, building.state].filter(Boolean).join(", ");
+  const location = [building.address !== title && building.address, city].filter(Boolean).join(" · ");
+  return { title, location, kind: building.type || building.kind };
+}
+
+// ---------------------------------------------------------------- banner
+
+function Banner({ catalog }: { catalog: Catalog }) {
+  const toResults = () => document.getElementById("catalog-title")?.scrollIntoView({ behavior: "smooth" });
   return (
-    <div className="hero-art" aria-hidden="true">
-      <div className="room-sketch">
-        <span className="ring" />
-        <span className="ring" />
-        <span className="ring" />
-        <span className="source" />
+    <section className="sound-hero">
+      <BannerWaves />
+      <div className="sound-hero-inner">
+        <h1>Every room has a <span className="rainbow-text">sound.</span></h1>
+        <figure className="hero-quote">
+          <blockquote>
+            <p>“The important thing isn’t if you can read… it’s can you hear it. <em className="rainbow-text">Can you hear the music…?</em>”</p>
+          </blockquote>
+          <figcaption>Niels Bohr to J. Robert Oppenheimer, in <cite>Oppenheimer</cite> (2023)</figcaption>
+        </figure>
+        <form className="sound-search" role="search" onSubmit={(event) => { event.preventDefault(); toResults(); }}>
+          <label className="search-field">
+            <span className="visually-hidden">Search buildings</span>
+            <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" /><path d="m13 13 4 4" /></svg>
+            <input type="search" value={catalog.query} placeholder="Try “La Mirada” or “Los Angeles”"
+              onChange={(event) => catalog.setQuery(event.target.value)} />
+          </label>
+          <button type="submit" className="cta-primary">Find rooms</button>
+        </form>
       </div>
-      <div className="meter">
-        {Array.from({ length: 18 }, (_, index) => <span key={index} style={{ animationDelay: `${(index % 6) * -0.17}s` }} />)}
-      </div>
-    </div>
+    </section>
   );
 }
 
-function Waveform() {
+// ---------------------------------------------------------------- catalog
+
+function Placeholder() {
   return (
-    <span className="mini-wave" aria-hidden="true">
-      {[0.4, 0.8, 0.55, 1, 0.65, 0.35, 0.75].map((height, index) => (
-        <span key={index} style={{ height: `${height * 100}%`, animationDelay: `${index * -0.12}s` }} />
-      ))}
+    <svg className="card-placeholder" viewBox="0 0 120 80" aria-hidden="true">
+      <path d="M22 66V36l26-18 26 18v30z" />
+      <path d="M40 66V48h16v18" />
+      <path className="wave" d="M84 30c6 6 6 18 0 24M92 24c10 10 10 26 0 36M100 18c14 14 14 34 0 48" />
+    </svg>
+  );
+}
+
+function Thumb({ building }: { building: BuildingSummary }) {
+  const [failed, setFailed] = useState(false);
+  const photo = building.preview_url && !failed;
+  return (
+    <span className={`row-thumb${photo ? "" : " no-image"}`}>
+      {photo ? <img src={building.preview_url} alt="" loading="lazy" onError={() => setFailed(true)} /> : <Placeholder />}
     </span>
   );
 }
 
-function BuildingCard({ building }: { building: BuildingSummary }) {
-  const [imageFailed, setImageFailed] = useState(false);
-  const title = building.name || building.address || building.sid;
-  const city = [building.city, building.state].filter(Boolean).join(", ");
-  const location = [building.address !== title && building.address, city].filter(Boolean).join(" · ");
-  const hasImage = building.preview_url && !imageFailed;
+function CatalogSection({ buildings, catalog }: { buildings: BuildingSummary[]; catalog: Catalog }) {
+  const count = (field: "kind" | "city", value: string) => buildings.filter((building) =>
+    building[field] === value && (!catalog.readyOnly || building.analysed)).length;
+  const kinds = [...new Set(buildings.map((building) => building.kind).filter(Boolean))] as string[];
+  const cities = [...new Set(buildings.map((building) => building.city).filter(Boolean))] as string[];
+  const ready = buildings.filter((building) => building.analysed).length;
 
   return (
-    <li>
-      <Link className="building-card" to={`/b/${encodeURIComponent(building.sid)}`}>
-        <div className={`card-media${hasImage ? "" : " no-image"}`}>
-          {hasImage ? (
-            <img src={building.preview_url} alt="" loading="lazy" onError={() => setImageFailed(true)} />
-          ) : (
-            <svg className="card-placeholder" viewBox="0 0 120 80" aria-hidden="true">
-              <path d="M22 66V36l26-18 26 18v30z" />
-              <path d="M40 66V48h16v18" />
-              <path className="wave" d="M84 30c6 6 6 18 0 24M92 24c10 10 10 26 0 36M100 18c14 14 14 34 0 48" />
-            </svg>
-          )}
-          {building.kind && <span className="kind-chip">{building.type || building.kind}</span>}
-          <span className={building.analysed ? "scan-status ready" : "scan-status"}>
-            {building.analysed && <span className="live-dot" aria-hidden="true" />}
-            {building.analysed ? "Ready to listen" : "Not analysed yet"}
-          </span>
-        </div>
-        <div className="card-body">
-          <h3>{title}</h3>
-          {location && <p className="card-location">{location}</p>}
-          <div className="card-footer">
-            <Waveform />
-            <span className="card-cta">{building.analysed ? "Explore rooms" : "Open building"} <span aria-hidden="true">→</span></span>
+    <main className="home-main catalog-layout">
+      <aside className="filter-panel" aria-label="Filters">
+        <label className="toggle-chip">
+          <input type="checkbox" checked={catalog.readyOnly} onChange={(event) => catalog.setReadyOnly(event.target.checked)} />
+          <span>Ready to listen only</span>
+        </label>
+        <fieldset>
+          <legend>Type</legend>
+          {["", ...kinds].map((value) => (
+            <label key={value || "all"} className="radio-row">
+              <input type="radio" name="kind" checked={catalog.kind === value} onChange={() => catalog.setKind(value)} />
+              <span>{value ? value.charAt(0).toUpperCase() + value.slice(1) : "All types"}</span>
+              {value && <em>{count("kind", value).toLocaleString()}</em>}
+            </label>
+          ))}
+        </fieldset>
+        <fieldset>
+          <legend>City</legend>
+          {["", ...cities].map((value) => (
+            <label key={value || "all"} className="radio-row">
+              <input type="radio" name="city" checked={catalog.city === value} onChange={() => catalog.setCity(value)} />
+              <span>{value || "All cities"}</span>
+              {value && <em>{count("city", value).toLocaleString()}</em>}
+            </label>
+          ))}
+        </fieldset>
+      </aside>
+      <section aria-labelledby="catalog-title">
+        <div className="section-title">
+          <div>
+            <h2 id="catalog-title">Find a room to listen to</h2>
+            <p className="catalog-count">
+              {catalog.matches.length.toLocaleString()} {catalog.matches.length === 1 ? "scan" : "scans"}
+              {catalog.query && <> matching “{catalog.query}”</>} · {ready} ready to listen
+            </p>
           </div>
         </div>
-      </Link>
-    </li>
+        {catalog.matches.length === 0 ? (
+          <div className="empty-state" role="status">
+            <p>No buildings match these filters.</p>
+            {catalog.readyOnly && <button type="button" onClick={() => catalog.setReadyOnly(false)}>Show all scans</button>}
+          </div>
+        ) : (
+          <ul className="result-rows">
+            {catalog.shown.map((building) => {
+              const { title, location, kind } = describe(building);
+              return (
+                <li key={building.sid}>
+                  <Link to={`/b/${encodeURIComponent(building.sid)}`} className="result-row">
+                    <Thumb building={building} />
+                    <span className="row-main">
+                      <strong>{title}</strong>
+                      <span>{[kind, location].filter(Boolean).join(" · ")}</span>
+                    </span>
+                    <span className={building.analysed ? "row-status ready" : "row-status"}>
+                      {building.analysed && <span className="live-dot" aria-hidden="true" />}
+                      {building.analysed ? "Ready to listen" : "Not analysed"}
+                    </span>
+                    <span className="row-arrow" aria-hidden="true">→</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {catalog.more && <button className="show-more" onClick={catalog.showMore}>Show more</button>}
+      </section>
+    </main>
+  );
+}
+
+// ---------------------------------------------------------------- page
+
+function Home({ buildings }: { buildings: BuildingSummary[] }) {
+  const catalog = useCatalog(buildings);
+  return (
+    <>
+      <Banner catalog={catalog} />
+      <CatalogSection buildings={buildings} catalog={catalog} />
+    </>
   );
 }
 
 export default function BuildingPicker() {
   const { state, retry } = useRequest(loadBuildings);
-  const [query, setQuery] = useState("");
-  const [availableOnly, setAvailableOnly] = useState(true);
-  const [limit, setLimit] = useState(PAGE_SIZE);
-
-  const buildings = state.status === "ready" ? state.data : [];
-  const search = query.trim().toLowerCase();
-  const matches = buildings.filter((building) =>
-    (!availableOnly || building.analysed) &&
-    [building.name, building.address, building.city, building.state, building.sid]
-      .some((value) => value?.toLowerCase().includes(search)),
-  );
-  const ready = buildings.filter((building) => building.analysed).length;
-  const cities = new Set(buildings.map((building) => building.city).filter(Boolean)).size;
-
   return (
     <div className="home">
-      <section className="hero">
-        <div className="hero-inner">
-          <div className="hero-copy">
-            <p className="hero-eyebrow">Room acoustics from 3D scans</p>
-            <h1>Hear a room <em>before</em> you walk in.</h1>
-            <p className="hero-lede">
-              Pick a scanned building, open any room, and listen to how a voice carries in it. Then try carpet,
-              panels or an exposed ceiling and hear the difference.
-            </p>
-            {state.status === "ready" && (
-              <dl className="hero-stats">
-                <div><dt>Ready to listen</dt><dd>{ready.toLocaleString()}</dd></div>
-                <div><dt>Matterport scans</dt><dd>{buildings.length.toLocaleString()}</dd></div>
-                {cities > 0 && <div><dt>Cities</dt><dd>{cities.toLocaleString()}</dd></div>}
-              </dl>
-            )}
-          </div>
-          <HeroArt />
-        </div>
-      </section>
-
-      <main className="home-main">
-        <ol className="steps" aria-label="How it works">
-          <li><span className="step-number">1</span><div><strong>Pick a building</strong><p>Matterport scans with CoStar records and Vexcel aerials.</p></div></li>
-          <li><span className="step-number">2</span><div><strong>Open a room</strong><p>See its shape, materials and the objects in it.</p></div></li>
-          <li><span className="step-number">3</span><div><strong>Listen and tweak</strong><p>Hear the echo, compare rooms, try a treatment.</p></div></li>
-        </ol>
-
-        <section aria-labelledby="catalog-title">
-          <div className="catalog-head">
-            <div>
-              <h2 id="catalog-title">Buildings</h2>
-              {state.status === "ready" && (
-                <p className="catalog-count">{matches.length.toLocaleString()} {matches.length === 1 ? "scan" : "scans"}</p>
-              )}
-            </div>
-            {state.status === "ready" && (
-              <div className="catalog-controls">
-                <label className="search-field">
-                  <span className="visually-hidden">Search buildings</span>
-                  <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" /><path d="m13 13 4 4" /></svg>
-                  <input type="search" value={query} placeholder="Search by name, address or city" onChange={(event) => {
-                    setQuery(event.target.value);
-                    setLimit(PAGE_SIZE);
-                  }} />
-                </label>
-                <label className="toggle-chip">
-                  <input type="checkbox" checked={availableOnly} onChange={(event) => {
-                    setAvailableOnly(event.target.checked);
-                    setLimit(PAGE_SIZE);
-                  }} />
-                  <span>Ready to listen only</span>
-                </label>
-              </div>
-            )}
-          </div>
-          {state.status === "loading" && <LoadingBlock label="Loading buildings" />}
-          {state.status === "error" && (
-            <p role="alert">Couldn’t load buildings. <button onClick={retry}>Try again</button></p>
-          )}
-          {state.status === "ready" && (
-            <>
-              {matches.length === 0 && (
-                <div className="empty-state" role="status">
-                  <p>No buildings match these filters.</p>
-                  {availableOnly && <button type="button" onClick={() => setAvailableOnly(false)}>Show all scanned buildings</button>}
-                </div>
-              )}
-              <ul className="building-grid">
-                {matches.slice(0, limit).map((building) => <BuildingCard key={building.sid} building={building} />)}
-              </ul>
-              {limit < matches.length && (
-                <button className="show-more" onClick={() => setLimit(limit + PAGE_SIZE)}>Show more buildings</button>
-              )}
-            </>
-          )}
-        </section>
-      </main>
+      {state.status === "loading" && <main className="home-main"><LoadingBlock label="Loading buildings" /></main>}
+      {state.status === "error" && (
+        <main className="home-main"><p role="alert">Couldn’t load buildings. <button onClick={retry}>Try again</button></p></main>
+      )}
+      {state.status === "ready" && <Home buildings={state.data} />}
     </div>
   );
 }
