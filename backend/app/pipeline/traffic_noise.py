@@ -30,7 +30,11 @@ INDOOR_FLOOR_DB = 18.0        # a quiet room never drops below fridge and ventil
 BACKGROUND_DB = 38.0          # distant city hum when no road is close (quiet LA residential night)
 WALL_R = 42.0                 # stucco or brick exterior wall, traffic-weighted (Rw + Ctr)
 GLASS_R = {"single": 24.0, "double": 30.0}
-OPEN_WINDOW_R = 12.0          # a window open for air
+# An open window is an opening that lets sound straight through (R = 0). Its size follows the window: one window on
+# the noisiest glazed wall is opened by a quarter of that wall's glass (a sash raised or a slider pushed back),
+# at most 0.5 m². A big picture window open lets in more than a small bathroom window.
+OPEN_SHARE = 0.25
+OPEN_MAX_M2 = 0.5
 INTERIOR_EXTRA = 10.0         # one more wall for a room with no windows
 INDOOR_DNL_LIMIT = 45.0       # interior DNL goal for homes: HUD 24 CFR 51.104 (nationwide), California CBC 1206.4
 SIDE_DB, REAR_DB = 4.0, 12.0  # a wall side-on to a road hears less; a wall facing away is shielded by the building
@@ -104,9 +108,12 @@ def glazing(year):
     return "double" if year and year >= 1980 else "single"
 
 
-def facade_r(wall_area, glass_area, glass_r, wall_r=WALL_R):
+def facade_r(wall_area, glass_area, glass_r, wall_r=WALL_R, open_area=0.0):
+    """Combined insulation of a wall with glass and an optional opening (transmission coefficients add by area)."""
     glass_area = min(glass_area, wall_area * 0.8)
-    tau = ((wall_area - glass_area) * 10 ** (-wall_r / 10) + glass_area * 10 ** (-glass_r / 10)) / wall_area
+    open_area = min(open_area, glass_area)
+    tau = ((wall_area - glass_area) * 10 ** (-wall_r / 10) + (glass_area - open_area) * 10 ** (-glass_r / 10)
+           + open_area) / wall_area
     return -10 * math.log10(tau)
 
 
@@ -191,26 +198,33 @@ def indoor(room, outside, year=None, walls=None, *, window_detected=False, exter
         # Glass goes where windows were seen (glass_weight, from the panorama views); otherwise by wall length.
         weights = sum(wall.get("glass_weight", wall["length_m"]) for wall in walls)
 
-        def through(window_r):
+        def wall_glass(wall):
+            return glass * wall.get("glass_weight", wall["length_m"]) / weights
+
+        def through(open_wall=None, open_area=0.0):
             levels = []
             for hour in range(24):
                 parts = []
                 for wall in walls:
                     area = wall["length_m"] * height
-                    wall_glass = glass * wall.get("glass_weight", wall["length_m"]) / weights
-                    parts.append(wall["hourly_db"][hour] - facade_r(area, wall_glass, window_r, wall_r)
+                    opening = open_area if wall is open_wall else 0.0
+                    parts.append(wall["hourly_db"][hour] - facade_r(area, wall_glass(wall), glass_r, wall_r, opening)
                                  + 10 * math.log10(area / absorption))
                 levels.append(round(energy(parts), 1))
             return levels
 
-        closed = through(glass_r)
+        closed = through()
         main = max(walls, key=lambda wall: dnl(wall["hourly_db"]))
         main_area = main["length_m"] * height
-        main_glass = glass * main.get("glass_weight", main["length_m"]) / weights
-        insulation = facade_r(main_area, main_glass, glass_r, wall_r)
+        insulation = facade_r(main_area, wall_glass(main), glass_r, wall_r)
         if window_scenario_available:
-            opened = through(OPEN_WINDOW_R)
-            insulation_open = facade_r(main_area, main_glass, OPEN_WINDOW_R, wall_r)
+            # One window opened: on the noisiest wall that has glass, sized from that wall's glass.
+            glazed = [wall for wall in walls if wall_glass(wall) > 0]
+            open_wall = max(glazed, key=lambda wall: dnl(wall["hourly_db"]))
+            open_area = min(OPEN_MAX_M2, OPEN_SHARE * wall_glass(open_wall))
+            opened = through(open_wall, open_area)
+            insulation_open = facade_r(open_wall["length_m"] * height, wall_glass(open_wall), glass_r, wall_r,
+                                       open_area)
     else:
         insulation = wall_r + INTERIOR_EXTRA
         area = math.sqrt(room["area_m2"]) * height
@@ -245,8 +259,8 @@ ASSUMPTIONS = [
     "building). Where the outline is missing or fits more than one way, the louder case is used.",
     "Wall and window insulation come from photos of the outside (or, failing that, the room photos), mapped to "
     f"typical Rw + Ctr values; with no photos, {WALL_R:.0f} dB walls and single glazing before 1980, double after. "
-    "Where an open-window scenario is available, it assumes "
-    f"the detected window can open and uses {OPEN_WINDOW_R:.0f} dB of insulation for the opening.",
+    "Where a window was detected, the open-window case opens one window on the noisiest glazed wall by "
+    f"{OPEN_SHARE:.0%} of that wall's glass (at most {OPEN_MAX_M2} m²); the opening lets sound straight through.",
     f"The comparison uses HUD's {INDOOR_DNL_LIMIT:.0f} dB DNL interior goal (24 CFR 51.101(a)(9)). "
     "The 30 dB nighttime bedroom reference comes from the WHO Guidelines for Community Noise.",
 ]

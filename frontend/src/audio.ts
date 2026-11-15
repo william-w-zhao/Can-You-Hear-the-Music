@@ -1,4 +1,4 @@
-// Ported from prototypes/acoustics: three decaying noise bands, 1.5 m listening distance.
+// Synthetic room impulse response: three decaying noise bands (125 Hz, 500 Hz, 2 kHz), listener 1.5 m away.
 export function impulse(c: AudioContext, rt: number[], absorb: number) {
   const sr = c.sampleRate,
     len = Math.round(sr * Math.min(3.5, Math.max(...rt) * 1.3 + 0.05));

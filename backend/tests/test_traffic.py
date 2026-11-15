@@ -192,3 +192,16 @@ class FacadeTests(TestCase):
         near = noise.wall_outdoor(facing, roads_xy, roads)
         far = noise.wall_outdoor(away, roads_xy, roads)
         self.assertAlmostEqual(near[12] - far[12], noise.REAR_DB, delta=0.5)
+
+
+class OpenWindowTests(TestCase):
+    def test_bigger_opening_lets_in_more(self):
+        closed = noise.facade_r(10, 2, 30, 42)
+        small = noise.facade_r(10, 2, 30, 42, open_area=0.1)
+        large = noise.facade_r(10, 2, 30, 42, open_area=0.5)
+        self.assertGreater(closed, small)
+        self.assertGreater(small, large)
+        self.assertAlmostEqual(large, -10 * math.log10((8 * 10 ** -4.2 + 1.5 * 10 ** -3 + 0.5) / 10), places=6)
+
+    def test_opening_cannot_exceed_the_glass(self):
+        self.assertEqual(noise.facade_r(10, 0.2, 30, 42, open_area=5), noise.facade_r(10, 0.2, 30, 42, open_area=0.2))
