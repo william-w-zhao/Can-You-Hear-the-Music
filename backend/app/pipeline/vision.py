@@ -12,7 +12,9 @@ from app.pipeline.cache_files import write_json
 from app.sources.config import DATA, ROOT
 
 MODEL = "yolov8s-worldv2.pt"
-ROOM_CLASSES = ("chair", "sofa", "table", "desk", "bed", "bookshelf", "cabinet", "rug", "window", "curtain", "door")
+# Bathroom and kitchen fixtures are listed too; without them YOLO-World calls a bathtub a "bed".
+ROOM_CLASSES = ("chair", "sofa", "table", "desk", "bed", "bookshelf", "cabinet", "rug", "window", "curtain", "door",
+                "toilet", "bathtub", "shower", "sink", "refrigerator", "stove")
 # Describe what the top-down camera sees; "building" alone misses roofs in our Vexcel clips.
 AERIAL_CLASSES = ("house roof", "building roof", "commercial roof")
 MIN_SCORE = 0.10

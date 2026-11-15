@@ -61,7 +61,8 @@ def containment(first, second):
 
 # YOLO-World often gives one object two related labels; these count as the same kind of object.
 FAMILIES = {"sofa": "seating", "chair": "seating", "table": "surface", "desk": "surface",
-            "cabinet": "storage", "bookshelf": "storage", "window": "opening", "curtain": "opening"}
+            "cabinet": "storage", "bookshelf": "storage", "window": "opening", "curtain": "opening",
+            "bathtub": "bathing", "shower": "bathing"}
 
 
 def family(label):

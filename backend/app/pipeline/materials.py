@@ -1,10 +1,13 @@
 """Validate room materials and optionally propose them from panorama contact sheets."""
 import base64
 import io
+import logging
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.pipeline.acoustics import CONTENTS, MATERIALS
+
+logger = logging.getLogger(__name__)
 
 
 class RoomMaterials(BaseModel):
@@ -46,7 +49,9 @@ def suggest_materials(directory, rooms, report, settings, object_evidence=None):
         "and four wall views in that order. Choose floor, ceiling and wall materials from: "
         + ", ".join(f"{key} ({value['name']})" for key, value in MATERIALS.items())
         + ". Choose furnishing from: " + ", ".join(CONTENTS)
-        + ". Estimate visible glass in square metres. Use low confidence when evidence is unclear."
+        + ". Glazed tile on a floor or wall (bathrooms, kitchens) is ceramic_tile, not vinyl_tile; if tile covers only "
+        "part of the walls, choose the material covering most of the wall area."
+        + " Estimate visible glass in square metres. Use low confidence when evidence is unclear."
     )
     suggestions = {}
     with Image.open(directory / "room_sheet.jpg") as sheet:
@@ -72,8 +77,10 @@ def suggest_materials(directory, rooms, report, settings, object_evidence=None):
             try:
                 suggestion = model.invoke([message])
             except ValueError:
+                logger.warning("Unusable material suggestion for room %s", room["id"], exc_info=True)
                 continue
             except Exception:
+                logger.exception("Material suggestion failed for room %s", room["id"])
                 report("The vision model could not finish. Complete the missing labels in the review form.")
                 break
             if suggestion is not None:

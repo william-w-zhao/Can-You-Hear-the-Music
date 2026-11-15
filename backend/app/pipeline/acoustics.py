@@ -24,7 +24,8 @@ BANDS = ["125", "500", "2000"]
 MATERIALS = {
     "commercial_carpet": {"name": "Commercial carpet", "a": [0.05, 0.20, 0.45], "range": [0.12, 0.30]},
     "carpet_on_pad":     {"name": "Carpet on pad", "a": [0.08, 0.55, 0.70], "range": [0.45, 0.65]},
-    "vinyl_tile":        {"name": "Vinyl / tile", "a": [0.02, 0.03, 0.04], "range": [0.02, 0.05]},
+    "vinyl_tile":        {"name": "Vinyl", "a": [0.02, 0.03, 0.04], "range": [0.02, 0.05]},
+    "ceramic_tile":      {"name": "Ceramic tile", "a": [0.01, 0.01, 0.02], "range": [0.01, 0.02]},
     "wood_floor":        {"name": "Wood floor", "a": [0.15, 0.10, 0.06], "range": [0.07, 0.12]},
     "concrete":          {"name": "Concrete", "a": [0.01, 0.02, 0.02], "range": [0.01, 0.03]},
     "acoustic_tile":     {"name": "Acoustic ceiling tile", "a": [0.35, 0.65, 0.80], "range": [0.50, 0.80]},
