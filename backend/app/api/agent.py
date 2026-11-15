@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 THREADS: dict[str, "Thread"] = {}
 TOOL_LABELS = {"list_rooms": "Listing rooms", "room_details": "Reading room details", "what_if": "Trying a what-if",
                "building_facts": "Reading listing facts", "view_room": "Looking at a room photo",
+               "street_noise": "Estimating street noise",
                "read_file": "Reading notes", "write_file": "Writing notes", "edit_file": "Editing notes",
                "ls": "Listing notes"}
 

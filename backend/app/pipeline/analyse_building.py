@@ -1,5 +1,6 @@
 """Prepare a scan for the acoustics dashboard, reusing completed stages on retry."""
 import json
+import logging
 
 from app.pipeline.acoustics import CONTENTS, MATERIALS, analyse_acoustics
 from app.pipeline.cache_files import write_json
@@ -74,4 +75,16 @@ def analyse_building(sid, report):
 
     report("Calculating room echo times")
     analyse_acoustics(sid, directory)
+    report("Looking up traffic on nearby roads")
+    try:
+        from app.sources.traffic import fetch_traffic
+
+        fetch_traffic(sid)
+        from app.pipeline.exterior import assess_exterior
+
+        report("Reading the outside walls from photos")
+        assess_exterior(sid, settings=resolve_review_model()[0])
+    except Exception:
+        # Street noise is optional; the page fetches it again on first view.
+        logging.getLogger(__name__).warning("Traffic lookup failed for %s", sid, exc_info=True)
     return None

@@ -1,23 +1,25 @@
-import type { AcousticDetails } from "../api";
+import type { AcousticDetails, RoomOutline } from "../api";
 
 // The room interior (photos, objects, merging) lives in RoomInterior.tsx.
 export function Dimensions({
   dimensions,
+  outline,
+  floorplanUrl,
+  sourceUrl,
 }: {
-  dimensions: NonNullable<AcousticDetails["dimensions"]>;
+  dimensions: AcousticDetails["dimensions"];
+  outline?: RoomOutline;
+  floorplanUrl?: string;
+  sourceUrl: string;
 }) {
+  if (!dimensions && !outline) return null;
+  const area = dimensions?.area_m2 ?? outline?.area_m2;
   const metrics = [
-    ["Length", dimensions.length_m, "m"],
-    ["Width", dimensions.width_m, "m"],
-    ["Ceiling height", dimensions.height_m, "m"],
-    [
-      "Floor area",
-      dimensions.area_m2 === null
-        ? null
-        : Math.round(dimensions.area_m2 * 10.7639104),
-      "ft²",
-    ],
-    ["Volume", dimensions.volume_m3, "m³"],
+    ["Floor area", area, "m²"],
+    ["Length", dimensions?.length_m, "m"],
+    ["Width", dimensions?.width_m, "m"],
+    ["Ceiling height", dimensions?.height_m ?? outline?.height_m, "m"],
+    ["Room volume", dimensions?.volume_m3 ?? outline?.volume_m3, "m³"],
   ] as const;
   const heightNotes = {
     matterport: "Ceiling height comes from Matterport's scan dimensions.",
@@ -27,29 +29,36 @@ export function Dimensions({
       "Ceiling height uses the floor-wide point cloud estimate.",
   };
   return (
-    <section className="details-panel" aria-labelledby="dimensions-title">
-      <h2 id="dimensions-title">Room dimensions</h2>
-      <dl className="metrics">
+    <div className="room-dimensions">
+      <dl aria-label="Room dimensions">
         {metrics.map(
           ([label, value, unit]) =>
-            value !== null && (
+            value != null && (
               <div key={label}>
                 <dt>{label}</dt>
                 <dd>
-                  {value} <span>{unit}</span>
+                  {value.toFixed(1)} {unit}
+                  {label === "Floor area" && <small>{Math.round(value * 10.7639104)} ft²</small>}
                 </dd>
               </div>
             ),
         )}
       </dl>
-      <p>
-        Length and width span the outline from{" "}
-        {dimensions.footprint_source === "matterport"
-          ? "Matterport"
-          : "the point cloud"}
-        . Floor area is an estimate from the scan.{" "}
-        {heightNotes[dimensions.height_source]}
-      </p>
-    </section>
+      <details>
+        <summary>Measurement details</summary>
+        {dimensions && (
+          <p>
+            {dimensions.footprint_source === "matterport" ? "Matterport" : "The point cloud"} provides the room outline.
+            Floor area is estimated from the scan. {heightNotes[dimensions.height_source]}
+          </p>
+        )}
+        <p>
+          {floorplanUrl && <><a className="source-link" href={floorplanUrl} target="_blank" rel="noreferrer">Scan floor plan</a>{" · "}</>}
+          <a className="source-link" href={sourceUrl} target="_blank" rel="noreferrer">Room geometry (JSON)</a>{" · "}
+          <a className="source-link" href="https://matterport.github.io/showcase-sdk/modelapi_property_intelligence.html"
+            target="_blank" rel="noreferrer">Matterport Model API</a>
+        </p>
+      </details>
+    </div>
   );
 }

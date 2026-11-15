@@ -1,5 +1,13 @@
+import json
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest import TestCase
+from unittest.mock import patch
 
+from fastapi.testclient import TestClient
+
+from app.api import acoustics
+from app.main import app
 from app.pipeline.object_groups import detection_id, group_detections, merge_decisions, split_decisions
 
 SIZE = 200
@@ -79,3 +87,40 @@ class GroupingTests(TestCase):
         # Merging again overrides the earlier "separate" decisions among the chosen boxes.
         again = merge_decisions(hits, SIZE, split, ids[:2])
         self.assertEqual(len(group_detections(hits, SIZE, again)["groups"]), 2)
+
+    def test_saved_low_score_merge_is_counted_without_rerunning_review(self):
+        hits = [hit("sofa", WALL_2, [170, 120, 200, 200], 0.21), hit("sofa", WALL_3, [0, 125, 120, 200], 0.22)]
+        ids = [detection_id(item) for item in hits]
+        before = group_detections(hits, SIZE, {})["groups"]
+        self.assertEqual([item["status"] for item in before], ["low_score", "low_score"])
+        after = group_detections(hits, SIZE, merge_decisions(hits, SIZE, {}, ids))["groups"]
+        self.assertEqual(len(after), 1)
+        self.assertEqual(after[0]["status"], "estimated")
+        self.assertTrue(after[0]["confirmed"])
+        self.assertEqual(after[0]["confidence"], 0.22)
+
+
+class InventoryApiTests(TestCase):
+    def test_keep_merge_and_split_low_score_objects_persist(self):
+        hits = [hit("chair", WALL_2, [170, 120, 200, 200], 0.21), hit("chair", WALL_3, [0, 125, 120, 200], 0.22)]
+        ids = [detection_id(item) for item in hits]
+        base = "/api/buildings/testscan/rooms/r1/acoustics/object-review"
+        with TemporaryDirectory() as data, patch("app.api.cache.DATA", Path(data)), TestClient(app) as client:
+            scan = Path(data) / "testscan"
+            scan.mkdir()
+            evidence = {"status": "complete", "width": acoustics.SHEET_MARGIN + len(acoustics.VIEWS) * SIZE,
+                        "rooms": {"r1": {"detections": hits}}}
+            (scan / "vision.json").write_text(json.dumps({"indoor": evidence}))
+
+            kept = client.post(f"{base}/keep", json={"detection_ids": ids}).raise_for_status().json()["groups"]
+            self.assertEqual(len(kept), 2)
+            self.assertTrue(all(g["confirmed"] and g["status"] != "low_score" for g in kept))
+            merged = client.post(f"{base}/merge", json={"detection_ids": ids}).raise_for_status().json()["groups"]
+            self.assertEqual(len(merged), 1)
+            self.assertEqual(set(merged[0]["detection_ids"]), set(ids))
+            reloaded, size = acoustics.indoor_evidence("testscan", "r1", scan)
+            self.assertEqual(group_detections(reloaded["detections"], size, acoustics.object_decisions("testscan", "r1"))["groups"], merged)
+            split = client.post(f"{base}/split", json={"detection_ids": ids}).raise_for_status().json()["groups"]
+            self.assertEqual(len(split), 2)
+            self.assertTrue(all(g["confirmed"] and g["status"] != "low_score" for g in split))
+            self.assertEqual(json.loads((scan / "vision.json").read_text())["indoor"]["rooms"]["r1"]["detections"], hits)

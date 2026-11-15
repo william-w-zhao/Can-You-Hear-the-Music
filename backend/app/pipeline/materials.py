@@ -35,7 +35,15 @@ class RoomMaterials(BaseModel):
         return value
 
 
+ROOM_NAMES = ("Living room", "Bedroom", "Dining room", "Kitchen", "Bathroom", "Hallway", "Entry hall", "Office",
+              "Den", "Family room", "Laundry room", "Closet", "Breakfast nook", "Conference room", "Open office",
+              "Break room", "Reception", "Storage")
+
+
 class MaterialSuggestion(RoomMaterials):
+    # Without this description the model filled "type" with schema words like "room" or "material_suggestion".
+    type: str = Field(min_length=1, max_length=40, description=(
+        "The room's everyday name, such as " + ", ".join(ROOM_NAMES) + ". Not a description of its materials."))
     confidence: float = Field(ge=0, le=1)
 
 
@@ -46,11 +54,14 @@ def suggest_materials(directory, rooms, report, settings, object_evidence=None):
     model = settings.structured(MaterialSuggestion, max_tokens=1400)
     prompt = (
         "Label this indoor room for an acoustic simulation. The image shows the ceiling, floor, "
-        "and four wall views in that order. Choose floor, ceiling and wall materials from: "
+        "and four wall views in that order. Name the room with a short everyday name (for example "
+        + ", ".join(ROOM_NAMES[:8]) + ") judged from what you see; the scan's own label is a hint and is "
+        "sometimes wrong. Choose floor, ceiling and wall materials from: "
         + ", ".join(f"{key} ({value['name']})" for key, value in MATERIALS.items())
         + ". Choose furnishing from: " + ", ".join(CONTENTS)
         + ". Glazed tile on a floor or wall (bathrooms, kitchens) is ceramic_tile, not vinyl_tile; if tile covers only "
-        "part of the walls, choose the material covering most of the wall area."
+        "part of the walls, choose the material covering most of the wall area. acoustic_panel means "
+        "purpose-made sound-absorbing panels (fabric or foam); decorative wood paneling on studs is drywall."
         + " Estimate visible glass in square metres. Use low confidence when evidence is unclear."
     )
     suggestions = {}
@@ -69,7 +80,8 @@ def suggest_materials(directory, rooms, report, settings, object_evidence=None):
             message = HumanMessage(content=[
                 {"type": "image", "mime_type": "image/jpeg",
                  "base64": base64.b64encode(image.getvalue()).decode("ascii")},
-                {"type": "text", "text": prompt + f" Floor area: {room['area_m2']} m². "
+                {"type": "text", "text": prompt + f" Scan label: {room.get('matterport_label') or 'none'}. "
+                 f"Floor area: {room['area_m2']} m². "
                  f"Wall area: {room['perimeter_m'] * room['height_m']:.1f} m². "
                  f"YOLO object hints: {objects}. Lower confidence candidates: {candidates}. "
                  "Check these hints against the images."},

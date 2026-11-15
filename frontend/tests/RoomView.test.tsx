@@ -83,9 +83,20 @@ it("retains William's panorama evidence and applies approved reviews to the comp
   expect(
     screen.getByRole("button", { name: "Chair, 90% model score" }),
   ).toBeInTheDocument();
-  expect(screen.getByText(/Ceiling height is assumed/)).toBeInTheDocument();
+  await userEvent.click(screen.getByText("Measurement details"));
+  expect(screen.getByText(/Ceiling height is assumed/)).toBeVisible();
+  const panels = screen.getByRole("spinbutton", { name: /Added acoustic wall panels/ });
+  await userEvent.clear(panels);
+  await userEvent.type(panels, "50");
+  expect(screen.getByRole("button", { name: "Apply what-if" })).toBeDisabled();
+  await userEvent.clear(panels);
+  await userEvent.type(panels, "4");
   await userEvent.click(screen.getByRole("button", { name: "Apply what-if" }));
   await screen.findByText("Material what-if");
+  expect(fetcher).toHaveBeenCalledWith(
+    "/api/buildings/office/rooms/r1/acoustics/what-if",
+    expect.objectContaining({ body: expect.stringContaining('"wall_panel_m2":4') }),
+  );
   await userEvent.click(
     screen.getByRole("button", { name: "Review this room" }),
   );
@@ -132,6 +143,7 @@ it("loads a specific room, compares a second room, and preserves the selected ba
   expect(screen.getByText("Loading your space...")).toBeInTheDocument();
   await screen.findByRole("heading", { name: "Meeting room", level: 1 });
   expect(screen.getByText("16.0 m²")).toBeInTheDocument();
+  expect(screen.getAllByText("Floor area", { selector: "dt" })).toHaveLength(1);
   expect(
     screen.getByText(
       "Choose a second room to see echo, material and listening comparisons.",

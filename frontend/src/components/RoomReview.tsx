@@ -73,6 +73,10 @@ export default function RoomReview({ sid, roomId, details, onSave }: {
       <h2 id="room-review-title">Room review</h2>
       <p>Floor · {details.material_options[details.room.floor]} · Walls · {details.material_options[details.room.walls]}
         {" · "}Ceiling · {details.material_options[details.room.ceiling]}</p>
+      <p>Material labels and glass estimates come from room image analysis or saved reviews.
+        {details.materials_source && ` Saved analysis: ${details.materials_source}.`}
+        {Boolean(details.reviewed_surfaces?.length) && ` Later reviewed surfaces: ${details.reviewed_surfaces?.join(", ")}.`}
+      </p>
       {details.can_run_room_review ? (
         <>
           <p>The model checks uncertain detections and duplicates using the room photos. Clear object decisions are applied automatically. Material changes need your approval.</p>

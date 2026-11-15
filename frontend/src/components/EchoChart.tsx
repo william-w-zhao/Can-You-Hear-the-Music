@@ -4,10 +4,12 @@ export default function EchoChart({
   baseline,
   scenario,
   bands,
+  sourceUrl,
 }: {
   baseline: RoomAcoustics;
   scenario?: RoomAcoustics;
   bands: string[];
+  sourceUrl?: string;
 }) {
   const max = Math.max(...baseline.rt60, ...(scenario?.rt60 ?? []), 1);
   return (
@@ -45,8 +47,11 @@ export default function EchoChart({
         scanned
         {scenario &&
           `; ${scenario.rt60_range_500.map((n) => n.toFixed(2)).join("–")} s comparison`}
-        . Estimated from typical material absorption; not a measured room
-        recording.
+        . The range varies the app’s material absorption assumptions.
+      </p>
+      <p className="muted">Method and inputs{" · "}
+        <a className="source-link" href="https://physics.byu.edu/docs/publication/2040" target="_blank" rel="noreferrer">Eyring’s reverberation formula</a>
+        {sourceUrl && <>{" · "}<a className="source-link" href={sourceUrl} target="_blank" rel="noreferrer">Room analysis and absorption coefficients (JSON)</a></>}
       </p>
     </section>
   );

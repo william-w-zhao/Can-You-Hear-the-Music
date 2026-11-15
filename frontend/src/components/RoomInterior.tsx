@@ -47,16 +47,19 @@ function PanoramaFace({ evidence, view, boxes, activeBox, onBoxPreview, onBoxSel
   );
 }
 
-export default function RoomInterior({ sid, roomId, evidence }: { sid: string; roomId: string; evidence: Evidence }) {
+export default function RoomInterior({ sid, roomId, evidence, onWindowReview }: {
+  sid: string; roomId: string; evidence: Evidence; onWindowReview: () => void;
+}) {
   const [inventory, setInventory] = useState(evidence.inventory);
   const [selectedView, setSelectedView] = useState<string>();
-  const [picked, setPicked] = useState<string[]>([]);          // object (group) ids chosen for merging
+  const [picked, setPicked] = useState<string[]>([]);
   const [focused, setFocused] = useState<string>();
   const [hovered, setHovered] = useState<string>();
   const [showBoxes, setShowBoxes] = useState(true);
   const [showLow, setShowLow] = useState(false);
   const [busy, setBusy] = useState<string>();
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
   const views = evidence.views ?? [];
   const detections = evidence.detections ?? [];
@@ -84,13 +87,20 @@ export default function RoomInterior({ sid, roomId, evidence }: { sid: string; r
     setPicked((current) => current.includes(groupId) ? current.filter((id) => id !== groupId) : [...current, groupId]);
   }
 
-  async function change(action: "merge" | "split", ids: string[]) {
-    setBusy(action === "merge" ? "Merging" : "Splitting");
+  async function change(action: "keep" | "merge" | "split", ids: string[]) {
+    const updates = { keep: api.keepObjects, merge: api.mergeObjects, split: api.splitObjects };
+    setBusy("Updating objects");
     setError("");
+    setNotice("");
     try {
-      setInventory(await (action === "merge" ? api.mergeObjects : api.splitObjects)(sid, roomId, ids));
+      const updated = await updates[action](sid, roomId, ids);
+      setInventory(updated);
       setPicked([]);
-      setFocused(undefined);
+      setFocused(updated.groups.find((group) => group.detection_ids.includes(ids[0]))?.id);
+      setNotice({ keep: "Added to the object list.", merge: "Merged into one object.", split: "Detections split." }[action]);
+      if (detections.some((hit) => hit.label.toLowerCase() === "window" && hit.needs_review && ids.includes(hit.id))) {
+        onWindowReview();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn’t update the objects.");
     } finally {
@@ -105,7 +115,7 @@ export default function RoomInterior({ sid, roomId, evidence }: { sid: string; r
       <li key={group.id} className={`object-row${isPicked ? " picked" : ""}${activeGroup === group.id ? " active" : ""}`}
         onMouseEnter={() => setHovered(group.id)} onMouseLeave={() => setHovered(undefined)}>
         <input type="checkbox" checked={isPicked} disabled={Boolean(busy)} onChange={() => togglePick(group.id)}
-          aria-label={`Select ${group.label} for merging`} />
+          aria-label={`Select ${group.label}`} />
         <span className="object-dot" style={{ background: colorOf.get(group.id) }} aria-hidden="true" />
         <button type="button" className="object-main" onClick={() => {
           setFocused(group.id);
@@ -113,7 +123,8 @@ export default function RoomInterior({ sid, roomId, evidence }: { sid: string; r
         }}>
           <strong>{group.label}</strong>
           <span>{group.views.join(" + ")} · {Math.round(group.confidence * 100)}%
-            {boxCount > 1 && ` · ${boxCount} boxes`}{group.status === "needs_match" && " · possible duplicate"}</span>
+            {boxCount > 1 && ` · ${boxCount} boxes`}{group.confirmed && " · confirmed"}
+            {group.status === "needs_match" && " · possible duplicate"}</span>
         </button>
         {boxCount > 1 && (
           <button type="button" className="text-button" disabled={Boolean(busy)}
@@ -133,10 +144,13 @@ export default function RoomInterior({ sid, roomId, evidence }: { sid: string; r
   }
 
   const pickedDetections = picked.flatMap((id) => groups.find((group) => group.id === id)?.detection_ids ?? []);
+  const pickedLow = lowScore.filter((group) => picked.includes(group.id));
   return (
     <section className="details-panel room-interior" aria-labelledby="interior-title">
       <h2 id="interior-title">Room interior</h2>
-      <p className="panel-note">Six photos from one camera position. One object can appear in two neighbouring photos.</p>
+      <p className="panel-note">Matterport panorama faces from one scan position. Boxes come from{" "}
+        <a className="source-link" href="https://docs.ultralytics.com/models/yolo-world/" target="_blank" rel="noreferrer">YOLO-World</a>
+        {evidence.model && ` (${evidence.model})`}. One object can appear in two neighbouring photos.</p>
       <div className="interior-layout">
         <div>
           <div className="interior-controls view-tabs" role="group" aria-label="Panorama views">
@@ -177,10 +191,16 @@ export default function RoomInterior({ sid, roomId, evidence }: { sid: string; r
             }[evidence.status]}</p>
           ) : (
             <>
-              <p className="panel-note">Click boxes in the photo or tick objects here, then merge the ones that are the same thing.</p>
+              <p className="panel-note">Select boxes or list entries to merge detections of the same object.</p>
               {picked.length > 0 && (
                 <div className="merge-bar">
                   <span>{picked.length} selected</span>
+                  {pickedLow.length > 0 && (
+                    <button type="button" disabled={Boolean(busy)}
+                      onClick={() => void change("keep", pickedLow.flatMap((group) => group.detection_ids))}>
+                      {pickedLow.length === 1 ? "Keep as an object" : "Keep as separate objects"}
+                    </button>
+                  )}
                   <button type="button" className="primary" disabled={picked.length < 2 || Boolean(busy)}
                     onClick={() => void change("merge", pickedDetections)}>Merge into one object</button>
                   <button type="button" disabled={Boolean(busy)} onClick={() => setPicked([])}>Clear</button>
@@ -188,11 +208,12 @@ export default function RoomInterior({ sid, roomId, evidence }: { sid: string; r
               )}
               {busy && <Spinner size="small" label={busy} />}
               {error && <p role="alert">{error}</p>}
+              {notice && <p role="status">{notice}</p>}
               <ul className="object-list">{confident.map(row)}</ul>
               {lowScore.length > 0 && (
                 <details className="low-score">
                   <summary>Low-score detections ({lowScore.length})</summary>
-                  <p className="panel-note">Not counted as objects. Tick one to include it in a merge.</p>
+                  <p className="panel-note">Select valid detections to add them to the object list or merge duplicate boxes.</p>
                   <ul className="object-list">{lowScore.map(row)}</ul>
                 </details>
               )}

@@ -5,6 +5,7 @@ import { useData } from "../useData";
 import LoadState from "../components/LoadState";
 import EchoChart from "../components/EchoChart";
 import Listen from "../components/Listen";
+import StreetNoise from "../components/StreetNoise";
 import WhatIf from "../components/WhatIf";
 import RoomComparison from "../components/RoomComparison";
 import RoomImages from "../components/RoomImages";
@@ -29,6 +30,9 @@ function RoomWorkspace({ sid, rid }: { sid: string; rid: string }) {
   const [reviewed, setReviewed] = useState<AcousticDetails>();
   const [reviewCount, setReviewCount] = useState(0);
   const details = reviewed ?? data?.details;
+  const traffic = useData(`traffic/${sid}/${Boolean(data)}`, (signal) =>
+    data ? api.traffic(sid, signal) : Promise.resolve(undefined),
+  );
   const [scenario, setScenario] = useState<RoomAcoustics>();
   const [compare, setCompare] = useState("");
   const comparison = useData(`${sid}/${compare}`, (signal) =>
@@ -59,61 +63,63 @@ function RoomWorkspace({ sid, rid }: { sid: string; rid: string }) {
   );
   const base = details?.room;
   const geometry = data?.plan.rooms.find((room) => room.id === rid);
+  const roomTraffic = traffic.data?.rooms?.[rid];
+  const buildingApi = `/api/buildings/${encodeURIComponent(sid)}`;
+  const roomSource = `${buildingApi}/rooms/${encodeURIComponent(rid)}/acoustics`;
   return (
     <div className="room-page">
       <main>
         <Link className="back" to={`/b/${encodeURIComponent(sid)}`}>
           ← Back to floor plan
         </Link>
-        <div className="eyebrow">LISTEN / 03</div>
-        <h1>{base?.type || `Room ${rid}`}</h1>
+        <header className="room-overview">
+          <div className="room-overview-top">
+            <div className="room-heading">
+              <h1>{base?.type || `Room ${rid}`}</h1>
+              {base && (
+                <div className="room-badges">
+                  <span className="badge ready">{base.verdict}</span>
+                  {roomTraffic && Number.isFinite(roomTraffic.dnl) ? (
+                    <a className={`badge traffic-badge${roomTraffic.meets_indoor_limit ? "" : " elevated"}`}
+                      href="#street-noise-title" title={roomTraffic.facade?.window_scenario_available
+                        ? "Estimated indoor day-night average with windows closed" : "Estimated indoor day-night average"}>
+                      Traffic · {roomTraffic.dnl.toFixed(1)} dB DNL
+                    </a>
+                  ) : (traffic.data || traffic.error) && (
+                    <span className="badge">Traffic estimate unavailable</span>
+                  )}
+                </div>
+              )}
+            </div>
+            {base && (
+              <dl className="room-echo" aria-label="Echo times at 500 Hz">
+                <div>
+                  <dt>Echo at 500 Hz</dt>
+                  <dd>{base.rt60[1].toFixed(2)} <small>s</small></dd>
+                </div>
+                {scenario && (
+                  <div>
+                    <dt>What-if echo</dt>
+                    <dd>{scenario.rt60[1].toFixed(2)} <small>s</small></dd>
+                  </div>
+                )}
+              </dl>
+            )}
+          </div>
+          {details && <Dimensions dimensions={details.dimensions} outline={geometry}
+            floorplanUrl={data?.plan.floorplan?.url} sourceUrl={`${buildingApi}/rooms`} />}
+        </header>
         {!data || !details || !base ? (
           <LoadState error={error} retry={retry} />
         ) : (
           <>
-            <div className="summary">
-              <div>
-                <span className="badge ready">{base.verdict}</span>
-                <p>
-                  {rid} / {sid}
-                </p>
-              </div>
-              <div className="metric">
-                <strong>
-                  {base.rt60[1].toFixed(2)}
-                  <small> s</small>
-                </strong>
-                <span>echo at 500 Hz</span>
-              </div>
-              {scenario && (
-                <div className="metric">
-                  <strong>
-                    {scenario.rt60[1].toFixed(2)}
-                    <small> s</small>
-                  </strong>
-                  <span>what-if · {scenario.verdict}</span>
-                </div>
-              )}
-            </div>
-            {geometry && (
-              <div className="dimensions">
-                <span>
-                  <b>{geometry.area_m2.toFixed(1)} m²</b> floor area
-                </span>
-                <span>
-                  <b>{geometry.height_m.toFixed(1)} m</b> ceiling height
-                </span>
-                <span>
-                  <b>{geometry.volume_m3.toFixed(1)} m³</b> room volume
-                </span>
-              </div>
-            )}
             {details.object_evidence?.views?.length ? (
               <RoomInterior
                 key={reviewCount}
                 sid={sid}
                 roomId={rid}
                 evidence={details.object_evidence}
+                onWindowReview={traffic.retry}
               />
             ) : (
               <RoomImages
@@ -123,6 +129,23 @@ function RoomWorkspace({ sid, rid }: { sid: string; rid: string }) {
                 plan={data.plan}
               />
             )}
+            <Listen choices={choices} voiceUrl={details.voice_url} />
+            <StreetNoise traffic={traffic} rid={rid} sourceUrl={`${buildingApi}/traffic`} />
+            <div className="workspace">
+              <EchoChart
+                baseline={base}
+                scenario={scenario}
+                bands={details.bands_hz}
+                sourceUrl={roomSource}
+              />
+              <WhatIf
+                key={reviewCount}
+                sid={sid}
+                rid={rid}
+                details={details}
+                onResult={setScenario}
+              />
+            </div>
             {details.object_evidence && (
               <RoomReview
                 sid={sid}
@@ -132,11 +155,9 @@ function RoomWorkspace({ sid, rid }: { sid: string; rid: string }) {
                   setReviewed(result);
                   setScenario(undefined);
                   setReviewCount((n) => n + 1);
+                  traffic.retry();
                 }}
               />
-            )}
-            {details.dimensions && (
-              <Dimensions dimensions={details.dimensions} />
             )}
             <RoomComparison
               baseline={details}
@@ -148,21 +169,6 @@ function RoomWorkspace({ sid, rid }: { sid: string; rid: string }) {
               error={comparison.error}
               retry={comparison.retry}
             />
-            <Listen choices={choices} voiceUrl={details.voice_url} />
-            <div className="workspace">
-              <EchoChart
-                baseline={base}
-                scenario={scenario}
-                bands={details.bands_hz}
-              />
-              <WhatIf
-                key={reviewCount}
-                sid={sid}
-                rid={rid}
-                details={details}
-                onResult={setScenario}
-              />
-            </div>
           </>
         )}
       </main>

@@ -92,6 +92,7 @@ async function post<T>(
 
 export type BuildingSummary = {
   sid: string;
+  costar_id?: string | number;
   analysed: boolean;
   name?: string;
   address?: string;
@@ -130,6 +131,8 @@ export type RoomMaterials = {
 
 export type RoomAcoustics = RoomMaterials & {
   id: string;
+  perimeter_m: number;
+  height_m: number;
   rt60: [number, number, number];
   rt60_range_500: [number, number];
   absorption_500: number;
@@ -156,6 +159,8 @@ export type AcousticDetails = {
       | "floor_point_cloud_estimate";
   } | null;
   object_evidence: ObjectEvidence;
+  materials_source?: string | null;
+  reviewed_surfaces?: string[];
   can_run_room_review?: boolean;
   review_model?: string | null;
   review_model_error?: string | null;
@@ -194,6 +199,7 @@ export type ObjectGroup = {
   views: string[];
   confidence: number;
   status: "estimated" | "needs_match" | "low_score";
+  confirmed?: boolean;
 };
 export type ObjectInventory = {
   groups: ObjectGroup[];
@@ -207,6 +213,7 @@ export type ObjectInventory = {
 
 export type ObjectEvidence = {
   status: EvidenceStatus;
+  model?: string;
   objects?: string[];
   candidates?: string[];
   detections?: (Detection & {
@@ -298,7 +305,52 @@ export type AgentEvent =
 export type AgentStatus = "idle" | "running" | "awaiting_approval" | "error";
 export type AgentEvents = { status: AgentStatus; events: AgentEvent[]; next: number };
 
+export type TrafficRoad = {
+  name: string;
+  class: string;
+  distance_m: number;
+  adt: number;
+  speed_kmh: number;
+  speed_source?: string;
+  osm_way_id?: number;
+  lines?: [number, number][][];
+  day_leq: number;
+  adt_source: { kind: "hpms" | "local_intersection" | "local_street" | "typical"; detail: string; date?: string; url?: string | null };
+};
+export type RoomTraffic = {
+  type?: string;
+  hourly_db: number[];
+  hourly_db_window_open: number[] | null;
+  dnl: number;
+  dnl_window_open: number | null;
+  night_leq: number;
+  day_leq: number;
+  quietest_hour: number;
+  loudest_hour: number;
+  verdict: string;
+  meets_indoor_limit: boolean;
+  facade: { exposure: string; glazing: string | null; note?: string | null; insulation_db: number;
+    window_scenario_available: boolean; insulation_open_db: number | null };
+};
+export type TrafficReport = {
+  outdoor: { hourly_db: number[]; dnl: number; day_leq: number; night_leq: number; roads: TrafficRoad[] };
+  rooms: Record<string, RoomTraffic>;
+  placement?: { status: "aligned" | "ambiguous" | "unknown"; reason?: string; fit?: number; options?: number };
+  exterior?: {
+    wall_label: string; window_label: string; basis: string; evidence: string; confidence: number;
+    wall_insulation_db: number; window_insulation_db: number;
+  } | null;
+  year_built: number | null;
+  indoor_limit_dnl: number;
+  assumptions: string[];
+  sources: string[];
+  notes: string[];
+  fetched_at?: string;
+};
+
 export const api = {
+  traffic: (sid: string, signal?: AbortSignal) =>
+    get<TrafficReport>(`/api/buildings/${encodeURIComponent(sid)}/traffic`, signal),
   agentThread: (sid: string) =>
     post<{ thread_id: string; model: string }>("/api/agent/threads", { sid }),
   agentAsk: (threadId: string, text: string) =>
@@ -387,6 +439,10 @@ export const api = {
     post<ObjectInventory>(`${acousticPath(sid, roomId)}/object-review/merge`, {
       detection_ids,
     }),
+  keepObjects: (sid: string, roomId: string, detection_ids: string[]) =>
+    post<ObjectInventory>(`${acousticPath(sid, roomId)}/object-review/keep`, {
+      detection_ids,
+    }),
   splitObjects: (sid: string, roomId: string, detection_ids: string[]) =>
     post<ObjectInventory>(`${acousticPath(sid, roomId)}/object-review/split`, {
       detection_ids,
@@ -409,7 +465,7 @@ export const api = {
   whatIf: async (
     sid: string,
     roomId: string,
-    materials: Partial<RoomMaterials>,
+    materials: Partial<RoomMaterials> & { wall_panel_m2?: number },
     signal?: AbortSignal,
   ) => {
     if (

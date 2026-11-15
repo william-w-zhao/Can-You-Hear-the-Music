@@ -21,6 +21,11 @@ function Surroundings({ evidence }: { evidence: SurroundingsEvidence }) {
       {evidence.status === "unavailable" && <p>Vexcel aerial imagery is unavailable for this scan.</p>}
       {evidence.status === "failed" && <p>Aerial detection could not run. You can retry image analysis.</p>}
       {evidence.mapped_buildings !== null && <p>OpenStreetMap lists {evidence.mapped_buildings} building outlines in this area.</p>}
+      <p className="source-note">Sources{" · "}
+        <a className="source-link" href="https://vexceldata.com/products/orthomosaic-imagery/" target="_blank" rel="noreferrer">Vexcel orthomosaic imagery</a>{" · "}
+        <a className="source-link" href="https://docs.ultralytics.com/models/yolo-world/" target="_blank" rel="noreferrer">YOLO-World</a>{" · "}
+        <a className="source-link" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap contributors (ODbL)</a>
+      </p>
       {evidence.image_url && evidence.width && evidence.height && (
         <details>
           <summary>Show aerial image and roof candidates</summary>
@@ -58,10 +63,17 @@ function Building({ sid }: { sid: string }) {
             {building.name && building.address && building.name !== building.address && (
               <p className="intro">{building.address}</p>
             )}
+            <p className="source-note">
+              {building.costar_id ? `CoStar hackathon kit record ${building.costar_id} and Matterport scan metadata` : "Scan metadata"}{" · "}
+              <a className="source-link" href={`/api/buildings/${encodeURIComponent(sid)}`} target="_blank" rel="noreferrer">Building record (JSON)</a>
+            </p>
             {geometry && geometry.rooms.length > 0 ? (
               <div className="room-layout">
                 <section className="plan-panel" aria-labelledby="plan-title">
                   <h2 id="plan-title">Floor plan</h2>
+                  {geometry.floorplan && <p className="source-note">Matterport scan{" · "}
+                    <a className="source-link" href={geometry.floorplan.url} target="_blank" rel="noreferrer">Original floor-plan image</a>
+                  </p>}
                   {geometry.floorplan ? (
                     <FloorPlan floorplan={geometry.floorplan} rooms={geometry.rooms} roomPath={roomPath}
                       activeRoom={activeRoom} onRoomPreview={setActiveRoom} />

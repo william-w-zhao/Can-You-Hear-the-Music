@@ -116,6 +116,23 @@ def list_rooms(sid: str):
     }
 
 
+@router.get("/{sid}/traffic")
+def get_traffic(sid: str):
+    """Street noise by hour outdoors and in each analysed room, wall by wall, with the source of every count."""
+    from app.api.acoustics import cached_room
+    from app.pipeline.street_noise import build_report
+
+    directory = scan_directory(sid)
+    if not (directory / "acoustics.json").is_file():
+        raise HTTPException(409, "Analyse this building before estimating street noise.")
+    row = next((row for row in catalog_rows() if row["sid"] == sid), {})
+    rooms = {room["id"]: cached_room(sid, room["id"])[1] for room in read_scan_file(sid, "acoustics.json")["rooms"]}
+    try:
+        return build_report(sid, row.get("year"), rooms, row.get("kind"))
+    except (RuntimeError, OSError, KeyError) as exc:
+        raise HTTPException(503, str(exc) or "Traffic data is unavailable right now.") from exc
+
+
 @router.get("/{sid}/surroundings")
 def get_surroundings(sid: str):
     """Keep image detections and mapped footprints as separate evidence sources."""

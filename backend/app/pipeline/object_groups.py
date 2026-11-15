@@ -29,6 +29,20 @@ def detection_id(hit):
     return sha256(json.dumps(identity, separators=(",", ":")).encode()).hexdigest()[:24]
 
 
+def reviewed_hits(hits, labels):
+    """Apply saved label decisions while retaining each detection's original ID."""
+    reviewed = []
+    for hit in hits:
+        proposal = labels.get(detection_id(hit))
+        if proposal == "dismiss":
+            continue
+        if proposal:
+            hit = {**hit, "original_label": hit.get("original_label", hit["label"]),
+                   "label": hit["label"] if proposal == "keep" else proposal, "needs_review": False}
+        reviewed.append(hit)
+    return reviewed
+
+
 def edge_interval(hit, edge, size):
     left, top, right, bottom = (value / size for value in hit["box_px"])
     if edge < 2:
@@ -188,16 +202,21 @@ def group_detections(raw_hits, size, decisions):
 
     pending = {key for review in reviews if review["decision"] is None
                for group in (groups[review["detection_ids"][0]], groups[review["detection_ids"][1]]) for key in group}
+    # Saved matches also cover older manual merges that predate the Keep action.
+    confirmed_ids = {key for pair, value in saved.items() if value == "same" for key in pair}
+    confirmed_ids.update(key for key, hit in hits.items() if hit.get("kept"))
     result = []
     for keys in set(groups.values()):
         ordered = sorted(keys, key=order.get)
+        confirmed = bool(confirmed_ids & keys)
         # Name the group after its most confident box.
         lead = max(ordered, key=lambda key: hits[key]["confidence"])
         result.append({"id": ordered[0], "label": hits[lead]["label"], "detection_ids": ordered,
                        "views": sorted({hits[key]["view"] for key in keys if "view" in hits[key]}),
                        "confidence": max(hits[key]["confidence"] for key in keys),
+                       "confirmed": confirmed,
                        "status": "needs_match" if pending & keys else
-                       "low_score" if all(hits[key]["needs_review"] for key in keys) else "estimated"})
+                       "low_score" if not confirmed and all(hits[key]["needs_review"] for key in keys) else "estimated"})
     reviews.sort(key=lambda review: review["decision"] is not None)
     result.sort(key=lambda group: (group["status"] == "low_score", -group["confidence"], order[group["id"]]))
     return {"groups": result, "reviews": reviews}

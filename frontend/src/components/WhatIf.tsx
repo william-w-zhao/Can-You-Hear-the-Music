@@ -28,6 +28,7 @@ export default function WhatIf({
   };
   const [values, setValues] = useState(initial);
   const [glass, setGlass] = useState(String(initial.glass_m2));
+  const [panels, setPanels] = useState("0");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -35,6 +36,11 @@ export default function WhatIf({
   useEffect(() => () => pending.current?.abort(), []);
   const validGlass =
     glass.trim() !== "" && Number.isFinite(Number(glass)) && Number(glass) >= 0;
+  const wallArea = base.perimeter_m * base.height_m;
+  const panelLimit = wallArea - Math.min(Number(glass), wallArea * 0.9);
+  const validPanels =
+    panels.trim() !== "" && Number.isFinite(Number(panels)) &&
+    Number(panels) >= 0 && Number(panels) <= panelLimit + 1e-9;
   return (
     <section className="panel">
       <div className="eyebrow">CHANGE THE SURFACE</div>
@@ -43,7 +49,7 @@ export default function WhatIf({
       <form
         onSubmit={async (e) => {
           e.preventDefault();
-          if (!validGlass || pending.current) return;
+          if (!validGlass || !validPanels || pending.current) return;
           const controller = new AbortController();
           pending.current = controller;
           setBusy(true);
@@ -53,7 +59,7 @@ export default function WhatIf({
             const room = await api.whatIf(
               sid,
               rid,
-              { ...values, glass_m2: Number(glass) },
+              { ...values, glass_m2: Number(glass), wall_panel_m2: Number(panels) },
               controller.signal,
             );
             if (!controller.signal.aborted) {
@@ -119,10 +125,18 @@ export default function WhatIf({
                 aria-invalid={!validGlass}
               />
             </label>
+            <label>
+              Added acoustic wall panels (m²)
+              <input type="number" required min="0" step="any" value={panels}
+                onChange={(e) => setPanels(e.target.value)} aria-invalid={!validPanels} />
+            </label>
           </div>
           {!validGlass && <p role="alert">Enter a non-negative glass area.</p>}
+          {validGlass && !validPanels && (
+            <p role="alert">Enter a panel area within the available opaque wall area ({panelLimit.toFixed(2)} m²).</p>
+          )}
           <div className="actions">
-            <button disabled={!validGlass} type="submit">
+            <button disabled={!validGlass || !validPanels} type="submit">
               {busy ? "Calculating..." : "Apply what-if"}
             </button>
             <button
@@ -131,6 +145,7 @@ export default function WhatIf({
               onClick={() => {
                 setValues(initial);
                 setGlass(String(initial.glass_m2));
+                setPanels("0");
                 onResult(undefined);
                 setError("");
                 setNotice("Reset to the original scan.");

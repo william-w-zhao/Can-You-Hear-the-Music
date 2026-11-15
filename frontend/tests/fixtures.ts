@@ -16,6 +16,8 @@ export const details: AcousticDetails = {
   furnishing_options: ["empty", "furnished"],
   room: {
     id: "r1",
+    perimeter_m: 16,
+    height_m: 3,
     type: "Meeting room",
     floor: "wood_floor",
     ceiling: "acoustic_tile",

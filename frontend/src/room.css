@@ -75,7 +75,7 @@
   width: min(1320px, 100%);
   max-width: 1320px;
   margin: auto;
-  padding: 65px 40px 90px;
+  padding: 26px 40px 90px;
   min-height: 75vh;
 }
 .room-page h1,
@@ -85,9 +85,10 @@
   letter-spacing: -1px;
 }
 .room-page h1 {
-  font-size: clamp(40px, 5vw, 70px);
-  font-weight: 500;
-  margin: 18px 0 22px;
+  font: 400 clamp(2.4rem, 4.4vw, 3.6rem) / 1.02 "Instrument Serif", Georgia, serif;
+  letter-spacing: -.035em;
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 .room-page h2 {
   font-size: 25px;
@@ -127,11 +128,53 @@
   color: #48663a;
 }
 .room-page .back {
-  display: block;
+  display: inline-block;
   font-size: 13px;
-  margin-bottom: 35px;
+  margin-bottom: 12px;
   color: #6a7a60;
 }
+.room-page .back:hover { text-decoration: underline; text-underline-offset: 3px; }
+.room-page .room-overview {
+  margin-bottom: 18px;
+  padding: clamp(14px, 2.4vw, 24px);
+  border: 1px solid #dbe2d2;
+  border-radius: 14px;
+  background: var(--surface);
+}
+.room-page .room-overview-top {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px clamp(24px, 5vw, 64px);
+}
+.room-page .room-heading { min-width: 0; }
+.room-page .room-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+.room-page .badge.traffic-badge { background: #eaf0f7; color: #344d69; }
+.room-page .badge.traffic-badge.elevated { background: #f4ead9; color: #694815; }
+.room-page .traffic-badge:hover { text-decoration: underline; text-underline-offset: 3px; }
+.room-page .room-echo { display: flex; flex-wrap: wrap; gap: 10px 20px; }
+.room-page .room-echo > div, .room-page .room-dimensions dl > div {
+  display: grid;
+  gap: 2px;
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+.room-page .room-echo dt, .room-page .room-dimensions dt { font-size: 12px; text-transform: none; color: var(--muted); }
+.room-page .room-echo dd, .room-page .room-dimensions dd { text-align: left; font-variant-numeric: tabular-nums; }
+.room-page .room-echo dd { font-size: clamp(1.65rem, 3vw, 2.15rem); font-weight: 600; line-height: 1.05; }
+.room-page .room-echo small { font-size: .55em; }
+.room-page .room-dimensions { border-top: 1px solid #e4e9dc; padding-top: 10px; margin-top: 12px; }
+.room-page .room-dimensions dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 7rem), 1fr));
+  gap: 8px 14px;
+}
+.room-page .room-dimensions dd { font-size: 15px; font-weight: 650; }
+.room-page .room-dimensions dd small { margin-left: 6px; font-size: 11px; font-weight: 400; color: var(--muted); white-space: nowrap; }
+.room-page .room-dimensions details { margin-top: 6px; font-size: 12px; color: var(--muted); }
+.room-page .room-dimensions summary { cursor: pointer; width: fit-content; }
+.room-page .room-dimensions p { margin-top: 4px; }
 .room-page .workspace {
   display: grid;
   grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
@@ -171,33 +214,6 @@
   border-radius: 50%;
   background: #6e8c52;
   margin-right: 12px;
-}
-.room-page .summary {
-  display: flex;
-  align-items: center;
-  gap: 50px;
-  padding: 15px 0 35px;
-}
-.room-page .summary p {
-  font-size: 12px;
-  color: #728169;
-}
-.room-page .metric {
-  display: flex;
-  flex-direction: column;
-}
-.room-page .metric > strong {
-  font-family: system-ui;
-  font-size: 48px;
-  font-weight: 500;
-  line-height: 1.2;
-}
-.room-page .metric small {
-  font-size: 21px;
-}
-.room-page .metric > span {
-  font-size: 12px;
-  color: #6e7b64;
 }
 .room-page .band {
   display: flex;
@@ -329,7 +345,7 @@
 }
 @media (max-width: 600px) {
   .room-page main {
-    padding: 35px 20px 60px;
+    padding: 16px 16px 60px;
   }
   .room-page .site-header {
     padding: 0 20px;
@@ -341,31 +357,12 @@
   .room-page .panel {
     padding: 22px;
   }
-  .room-page .summary {
-    gap: 25px;
-    flex-wrap: wrap;
-  }
   .room-page .form-grid {
     grid-template-columns: 1fr;
-  }
-  .room-page .metric > strong {
-    font-size: 38px;
   }
   .room-page footer {
     flex-direction: column;
   }
-}
-.room-page .dimensions {
-  display: flex;
-  gap: 40px;
-  padding: 0 0 35px;
-  color: #78846c;
-  font-size: 12px;
-}
-.room-page .dimensions b {
-  color: #314c39;
-  font-size: 15px;
-  margin-right: 6px;
 }
 .room-page .comparison-heading {
   display: flex;
@@ -452,10 +449,6 @@
   }
   .room-page .comparison-pair {
     grid-template-columns: 1fr;
-  }
-  .room-page .dimensions {
-    gap: 14px;
-    flex-wrap: wrap;
   }
   .room-page .comparison-card {
     padding: 22px;
@@ -615,3 +608,42 @@
 .room-page input[type="checkbox"] {
   width: auto;
 }
+
+/* Street noise (StreetNoise) */
+.room-page .street-noise { margin-top: 18px; }
+.room-page .noise-source { color: #5b6b65; }
+.room-page .noise-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-top: 14px; }
+.room-page label.noise-hour { display: flex; flex-direction: row; align-items: center; gap: 10px; flex: 1 1 260px; margin: 0; }
+.room-page .noise-hour span { min-width: 4.5em; font-weight: 700; font-variant-numeric: tabular-nums; }
+.room-page .noise-hour input { flex: 1; accent-color: #1e2822; }
+.room-page .noise-toggle { display: inline-flex; border: 1px solid #d8dccf; border-radius: 999px; overflow: hidden; }
+.room-page .noise-toggle button { padding: 6px 14px; border: 0; border-radius: 0; background: transparent; color: #1e2822; font: inherit; font-size: .88rem; cursor: pointer; }
+.room-page .noise-toggle button[aria-pressed="true"] { background: #1e2822; color: white; }
+.room-page .noise-readout { margin-top: 8px; }
+.room-page .noise-chart { display: block; width: 100%; height: auto; margin-top: 6px; cursor: pointer; }
+.room-page .noise-chart text { font-size: 11px; fill: #6b7a74; }
+.room-page .noise-night { fill: #eef1f6; }
+.room-page .noise-grid { stroke: #e7e9e1; }
+.room-page .noise-guide { stroke: #9bb7d9; stroke-dasharray: 4 4; }
+.room-page .noise-chart .noise-guide-label { fill: #5f8fd1; }
+.room-page .noise-outdoor, .room-page .noise-open, .room-page .noise-closed { fill: none; stroke-width: 2.5; stroke-linejoin: round; }
+.room-page .noise-outdoor { stroke: #f2a7a7; }
+.room-page .noise-open { stroke: #f5c86b; stroke-dasharray: 5 4; }
+.room-page .noise-closed { stroke: #1e2822; }
+.room-page .noise-cursor { stroke: #1e2822; stroke-opacity: .25; }
+.room-page .noise-dot { fill: #1e2822; }
+.room-page .noise-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: .85rem; }
+.room-page .noise-legend span::before { content: ""; display: inline-block; width: 18px; height: 0; margin-right: 6px; vertical-align: middle; border-top: 3px solid; }
+.room-page .key-outdoor::before { border-color: #f2a7a7 !important; }
+.room-page .key-closed::before { border-color: #1e2822 !important; }
+.room-page .key-open::before { border-color: #f5c86b !important; border-top-style: dashed !important; }
+.room-page .noise-details { margin-top: 14px; font-size: .9rem; }
+.room-page .noise-details summary { cursor: pointer; font-weight: 600; }
+.room-page .noise-table { max-height: 24rem; overflow: auto; margin-top: 10px; }
+.room-page .noise-details table { width: 100%; border-collapse: collapse; }
+.room-page .noise-details th, .room-page .noise-details td { padding: 5px 8px; border-bottom: 1px solid #e7e9e1; text-align: left; }
+.room-page .noise-details th { position: sticky; top: 0; background: #fcfdf9; }
+.room-page .noise-details td small { display: block; }
+.room-page .noise-details ul { padding-left: 18px; margin-top: 8px; color: #5b6b65; }
+.room-page .noise-sources { color: #6b7a74; font-size: .82rem; }
+.room-page .noise-check { color: #9a5b00; font-weight: 600; }

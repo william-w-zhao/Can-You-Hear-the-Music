@@ -14,7 +14,7 @@ from app.api.cache import read_scan_file, scan_directory
 from app.pipeline.acoustics import BANDS, CONTENTS, MATERIALS, room_acoustics
 from app.pipeline.cache_files import write_json
 from app.pipeline.dimensions import room_dimensions
-from app.pipeline.object_groups import detection_id, group_detections, merge_decisions, split_decisions
+from app.pipeline.object_groups import detection_id, group_detections, merge_decisions, reviewed_hits, split_decisions
 from app.pipeline.panorama_views import render as render_view
 from app.pipeline.panoramas import face_path, recover_face, skyboxes
 from app.pipeline.vision import FACE_ORDER, SHEET_MARGIN, VIEWS
@@ -34,7 +34,11 @@ class ObjectDecision(ObjectMatch):
     decision: Literal["same", "separate", "reset"]
 
 
-class ObjectSelection(BaseModel):
+class ObjectKeep(BaseModel):
+    detection_ids: list[str] = Field(min_length=1, max_length=40)
+
+
+class ObjectSelection(ObjectKeep):
     detection_ids: list[str] = Field(min_length=2, max_length=40)
 
 
@@ -50,6 +54,7 @@ class MaterialOverrides(BaseModel):
     ceiling: str | None = None
     walls: str | None = None
     glass_m2: float | None = Field(default=None, ge=0)
+    wall_panel_m2: float | None = Field(default=None, ge=0)
     furnishing: str | None = None
 
 
@@ -68,25 +73,23 @@ def cached_room(sid: str, room_id: str) -> tuple[dict, dict]:
 def indoor_evidence(sid, room_id, directory):
     if not (directory / "vision.json").is_file():
         return {"status": "pending"}, 0
-    indoor = read_scan_file(sid, "vision.json")["indoor"]
+    vision = read_scan_file(sid, "vision.json")
+    indoor = vision["indoor"]
     evidence = indoor.get("rooms", {}).get(room_id, {"status": indoor["status"]})
-    labels = room_reviews(sid).get(room_id, {}).get("labels", {})
-    if labels:
-        evidence = {**evidence, "detections": reviewed_hits(evidence.get("detections", []), labels)}
+    if vision.get("model"):
+        evidence = {**evidence, "model": vision["model"]}
+    review = room_reviews(sid).get(room_id, {})
+    labels = review.get("labels", {})
+    kept = set(review.get("kept", []))
+    if labels or kept:
+        hits = reviewed_hits(evidence.get("detections", []), labels)
+        evidence = {**evidence, "detections": mark_kept(hits, kept)}
     return evidence, (indoor.get("width", 0) - SHEET_MARGIN) // len(VIEWS)
 
 
-def reviewed_hits(hits, labels):
-    reviewed = []
-    for hit in hits:
-        proposal = labels.get(detection_id(hit))
-        if proposal == "dismiss":
-            continue
-        if proposal:
-            hit = {**hit, "original_label": hit.get("original_label", hit["label"]),
-                   "label": hit["label"] if proposal == "keep" else proposal, "needs_review": False}
-        reviewed.append(hit)
-    return reviewed
+def mark_kept(hits, kept):
+    # Confirmation affects the inventory without changing the original score or automatic matching.
+    return [{**hit, "kept": True} if detection_id(hit) in kept else hit for hit in hits]
 
 
 def room_reviews(sid):
@@ -147,6 +150,10 @@ def get_acoustics(sid: str, room_id: str):
         "room": room,
         "dimensions": room_dimensions(outline, geometry) if outline else None,
         "object_evidence": evidence,
+        "materials_source": analysis.get("materials_source"),
+        "reviewed_surfaces": sorted(room_reviews(sid).get(room_id, {}).get("materials", {})),
+        "absorption_coefficients": analysis.get("materials", MATERIALS),
+        "furnishing_allowances": analysis.get("contents", CONTENTS),
         "can_run_room_review": bool(settings and evidence.get("views")),
         "review_model": settings.identifier if settings else None,
         "review_model_error": model_error,
@@ -183,23 +190,36 @@ def review_objects(sid: str, room_id: str, match: ObjectDecision):
     return inventory
 
 
-def save_selection(sid, room_id, selection, change):
-    """Merge or split any set of detections the person picked, then return the updated groups."""
+def save_selection(sid, room_id, selection, action):
+    """Apply a manual inventory decision and return the persisted grouping."""
     directory = scan_directory(sid)
     with review_lock:
         evidence, size = indoor_evidence(sid, room_id, directory)
         hits = evidence.get("detections", [])
         known = {detection_id(hit) for hit in hits}
         ids = list(dict.fromkeys(selection.detection_ids))
-        if size <= 0 or len(ids) < 2 or not set(ids) <= known:
+        minimum = 1 if action == "keep" else 2
+        if size <= 0 or len(ids) < minimum or not set(ids) <= known:
             raise HTTPException(409, "The detections have changed. Refresh the room and try again.")
+        saved = room_reviews(sid)
+        review = saved.setdefault(room_id, {})
+        kept = set(review.get("kept", []))
+        decisions = object_decisions(sid, room_id)
         try:
-            decisions = change(hits, size, object_decisions(sid, room_id), ids)
-            inventory = group_detections(hits, size, decisions)
+            if action == "split":
+                # Undoing a saved merge keeps its confirmed detections visible as separate objects.
+                confirmed = {key for group in group_detections(hits, size, decisions)["groups"] if group["confirmed"]
+                             for key in group["detection_ids"]}
+                kept.update(confirmed.intersection(ids))
+                decisions = split_decisions(hits, size, decisions, ids)
+            else:
+                kept.update(ids)
+                if action == "merge":
+                    decisions = merge_decisions(hits, size, decisions, ids)
+            inventory = group_detections(mark_kept(hits, kept), size, decisions)
         except ValueError as exc:
             raise HTTPException(409, str(exc)) from exc
-        saved = room_reviews(sid)
-        saved.setdefault(room_id, {})["matches"] = decisions
+        review.update(matches=decisions, kept=sorted(kept))
         write_json(directory / "room_reviews.json", saved)
     return inventory
 
@@ -207,13 +227,19 @@ def save_selection(sid, room_id, selection, change):
 @cached_router.post("/object-review/merge")
 def merge_objects(sid: str, room_id: str, selection: ObjectSelection):
     """Treat all the selected detections as one physical object."""
-    return save_selection(sid, room_id, selection, merge_decisions)
+    return save_selection(sid, room_id, selection, "merge")
 
 
 @cached_router.post("/object-review/split")
 def split_objects(sid: str, room_id: str, selection: ObjectSelection):
     """Treat each selected detection as its own object."""
-    return save_selection(sid, room_id, selection, split_decisions)
+    return save_selection(sid, room_id, selection, "split")
+
+
+@cached_router.post("/object-review/keep")
+def keep_objects(sid: str, room_id: str, selection: ObjectKeep):
+    """Count the selected groups as objects without joining them."""
+    return save_selection(sid, room_id, selection, "keep")
 
 
 def room_photo_context(sid, room_id):
@@ -462,7 +488,11 @@ def what_if(sid: str, room_id: str, overrides: MaterialOverrides):
         raise HTTPException(422, "Unknown furnishing category")
     _, room = cached_room(sid, room_id)
     scenario = {**room, **changes}
-    return {**scenario, **room_acoustics(room, scenario)}
+    try:
+        metrics = room_acoustics(room, scenario)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    return {**scenario, **metrics}
 
 
 @router.get("/{room_id}/render.wav")

@@ -6,12 +6,13 @@ import Spinner from "./Spinner";
 const SUGGESTIONS = [
   "Which room is best for client video calls?",
   "Why does the loudest room echo, and what is the cheapest fix?",
-  "Do the saved materials for the living room match its photos?",
+  "Which bedroom is quietest at night with the street noise?",
 ];
 const AGENT_NAMES: Record<string, string> = {
   main: "Investigator",
   "material-annotator": "Material annotator",
   "acoustic-simulator": "Acoustic simulator",
+  "traffic-analyst": "Traffic analyst",
 };
 const POLL_MS = 1200;
 

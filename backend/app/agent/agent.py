@@ -12,7 +12,7 @@ def create_investigator(sid, model, checkpointer):
     return create_deep_agent(
         model=model,
         tools=[tools[name] for name in ("list_rooms", "room_details", "what_if", "building_facts", "view_room",
-                                        APPROVAL_TOOL)],
+                                        "street_noise", APPROVAL_TOOL)],
         subagents=subagents(tools),
         system_prompt=prompts.MAIN,
         interrupt_on={APPROVAL_TOOL: {"allowed_decisions": ["approve", "reject"]}},
