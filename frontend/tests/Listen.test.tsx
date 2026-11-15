@@ -55,6 +55,34 @@ const choices = [
   { label: "Comparison room", room: second.room },
 ];
 
+it("reuses synthesized footsteps across rooms and switches to a distinct chime sample", async () => {
+  const audio = fakeAudio();
+  render(<Listen choices={choices} voiceUrl={null} />);
+  await userEvent.selectOptions(
+    screen.getByLabelText("Test sound"),
+    "footsteps",
+  );
+  await userEvent.click(
+    screen.getAllByRole("button", { name: "▶ Footsteps" })[0],
+  );
+  await waitFor(() => expect(audio.sources[0].start).toHaveBeenCalled());
+  await userEvent.click(
+    screen.getAllByRole("button", { name: "▶ Footsteps" })[1],
+  );
+  await waitFor(() => expect(audio.sources[1].start).toHaveBeenCalled());
+  expect(audio.sources[0].buffer).toBe(audio.sources[1].buffer);
+  expect(audio.sources[0].buffer.duration).toBe(2.4);
+  expect(
+    Array.from(audio.sources[0].buffer.getChannelData(0)).some((n) => n !== 0),
+  ).toBe(true);
+  await userEvent.selectOptions(screen.getByLabelText("Test sound"), "chime");
+  await userEvent.click(screen.getAllByRole("button", { name: "▶ Chime" })[0]);
+  await waitFor(() => expect(audio.sources[2].start).toHaveBeenCalled());
+  expect(audio.sources[2].buffer.duration).toBe(1.8);
+  expect(audio.sources[2].buffer).not.toBe(audio.sources[0].buffer);
+  expect(audio.gains.every((g) => g.gain.value === 0.35)).toBe(true);
+});
+
 it("starts only on user action, reuses the same clap and gain, and cleans up on stop/unmount", async () => {
   const audio = fakeAudio();
   const view = render(<Listen choices={choices} voiceUrl={null} />);

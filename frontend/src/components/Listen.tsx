@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { api, type RoomAcoustics } from "../api";
-import { clap, impulse } from "../audio";
+import { clap, impulse, soundSample, type SoundKind } from "../audio";
 import Spinner from "./Spinner";
+
 
 export default function Listen({
   choices,
@@ -15,7 +16,8 @@ export default function Listen({
   const controller = useRef<AbortController>();
   const generation = useRef(0);
   const clip = useRef<{ url: string; buffer: AudioBuffer }>();
-  const clapBuffer = useRef<AudioBuffer>();
+  const samples = useRef<Partial<Record<SoundKind, AudioBuffer>>>({});
+  const [sample, setSample] = useState<SoundKind>("clap");
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -43,7 +45,7 @@ export default function Listen({
   async function play(
     room: RoomAcoustics,
     label: string,
-    kind: "voice" | "clap",
+    kind: "voice" | SoundKind,
   ) {
     stop();
     const run = ++generation.current;
@@ -75,8 +77,9 @@ export default function Listen({
           };
         buffer = clip.current.buffer;
       } else {
-        clapBuffer.current ??= clap(c);
-        buffer = clapBuffer.current;
+        samples.current[kind] ??=
+          kind === "clap" ? clap(c) : soundSample(c, kind);
+        buffer = samples.current[kind]!;
       }
       if (run !== generation.current) return;
       const source = c.createBufferSource(),
@@ -136,6 +139,24 @@ export default function Listen({
       aria-labelledby="listen-heading"
     >
       <h2 id="listen-heading">Listen to the room</h2>
+      <label className="sound-source-select">
+        Test sound
+        <select
+          value={sample}
+          onChange={(e) => {
+            stop();
+            setSample(e.target.value as SoundKind);
+          }}
+        >
+          <option value="clap">Clap</option>
+          <option value="footsteps">Footsteps</option>
+          <option value="chime">Chime</option>
+        </select>
+      </label>
+      <p className="muted">
+        Clap, footsteps and chime are synthesized test sounds, replayed
+        identically across rooms.
+      </p>
       <div className="listen-options">
         {choices.map(({ label, room }) => (
           <div key={label}>
@@ -150,9 +171,14 @@ export default function Listen({
               </button>
               <button
                 disabled={loading}
-                onClick={() => void play(room, label, "clap")}
+                onClick={() => void play(room, label, sample)}
               >
-                ▶ Clap
+                ▶{" "}
+                {sample === "clap"
+                  ? "Clap"
+                  : sample === "footsteps"
+                    ? "Footsteps"
+                    : "Chime"}
               </button>
             </div>
           </div>
