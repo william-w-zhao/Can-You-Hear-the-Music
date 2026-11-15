@@ -40,3 +40,42 @@ export function clap(c: AudioContext) {
     d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (n / 4));
   return buffer;
 }
+
+export type SoundKind = "clap" | "footsteps" | "chime";
+// Dry, synthesized references only; these are not measurements of occupants or traffic.
+export function soundSample(c: AudioContext, kind: Exclude<SoundKind, "clap">) {
+  const duration = kind === "footsteps" ? 2.4 : 1.8;
+  const buffer = c.createBuffer(
+    1,
+    Math.round(c.sampleRate * duration),
+    c.sampleRate,
+  );
+  const samples = buffer.getChannelData(0);
+  if (kind === "footsteps") {
+    for (let step = 0; step < 4; step++) {
+      const start = Math.round((0.1 + step * 0.5) * c.sampleRate);
+      let low = 0;
+      for (
+        let j = 0;
+        j < Math.round(0.22 * c.sampleRate) && start + j < samples.length;
+        j++
+      ) {
+        const t = j / c.sampleRate;
+        low = 0.85 * low + 0.15 * (Math.random() * 2 - 1);
+        samples[start + j] +=
+          0.65 * Math.sin(2 * Math.PI * 85 * t) * Math.exp(-30 * t) +
+          low * 0.45 * Math.exp(-18 * t);
+      }
+    }
+  } else {
+    for (let i = 0; i < samples.length; i++) {
+      const t = i / c.sampleRate,
+        attack = Math.min(1, t / 0.006);
+      samples[i] =
+        attack *
+        (0.45 * Math.sin(2 * Math.PI * 660 * t) * Math.exp(-3 * t) +
+          0.2 * Math.sin(2 * Math.PI * 1320 * t) * Math.exp(-5 * t));
+    }
+  }
+  return buffer;
+}
