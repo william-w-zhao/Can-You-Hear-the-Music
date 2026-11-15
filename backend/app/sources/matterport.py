@@ -5,13 +5,15 @@ floor-plan images and a representative panorama. The building fetch writes
 the metadata to data/<sid>/bundle.json alongside the downloaded images.
 """
 import io
+import json
 import os
+from tempfile import NamedTemporaryFile
 
 import numpy as np
 import requests
 from PIL import Image
 
-from app.sources.config import secret
+from app.sources.config import DATA, secret
 from app.sources.imagery import get, save_jpg
 
 MP_API = "https://api.matterport.com/api/models/graph"
@@ -46,6 +48,26 @@ Q_BASICS = """query($id: ID!) { model(id: $id) {
   floors { id label } rooms { id } panoLocations { id }
   image { url }
 } }"""
+
+MODEL_NAME_FILE = "model_name.json"
+Q_NAME = "query($id: ID!) { model(id: $id) { id name } }"
+
+
+def cache_model_name(sid: str) -> str | None:
+    """Save the display name without downloading or analysing the scan."""
+    if not sid.isascii() or not sid.isalnum():
+        raise ValueError("Invalid Matterport model ID")
+    model = mp(Q_NAME, id=sid).get("model") or {}
+    name = (model.get("name") or "").strip()
+    if model.get("id") != sid or not name or name == sid:
+        return None
+    directory = DATA / sid
+    directory.mkdir(parents=True, exist_ok=True)
+    with NamedTemporaryFile(mode="w", dir=directory, encoding="utf-8", delete=False) as temporary:
+        json.dump({"name": name}, temporary)
+    os.replace(temporary.name, directory / MODEL_NAME_FILE)
+    return name
+
 
 Q_VIEW = """query($id: ID!) { model(id: $id) { view(type: "matterport.model.defurnished") { id } } }"""
 
@@ -224,3 +246,12 @@ def fetch_site(sid, bundle):
                       "drone_photo_count": len(photos), "drone_photo_sample": photos[:5],
                       "drone_flight_start": stamps[0] if stamps else None,
                       "drone_flight_end": stamps[-1] if stamps else None}
+
+
+if __name__ == "__main__":
+    from argparse import ArgumentParser
+
+    parser = ArgumentParser(description="Cache Matterport display names without downloading scans.")
+    parser.add_argument("model_ids", nargs="+")
+    for sid in parser.parse_args().model_ids:
+        print(f"{sid}: {cache_model_name(sid) or 'No model name available'}")

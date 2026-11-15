@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, type Surroundings as SurroundingsEvidence } from "../api";
+import AgentPanel from "../components/AgentPanel";
 import BuildingAnalysis from "../components/BuildingAnalysis";
 import EvidenceImage from "../components/EvidenceImage";
 import FloorPlan from "../components/FloorPlan";
@@ -89,6 +90,7 @@ function Building({ sid }: { sid: string }) {
             {geometry && building.vision_pending && (
               <BuildingAnalysis sid={sid} initialJobId={building.analysis_job_id} onReady={retry} visionOnly />
             )}
+            {building.analysed && geometry && geometry.rooms.length > 0 && <AgentPanel sid={sid} />}
             {surroundings && surroundings.status !== "pending" && <Surroundings evidence={surroundings} />}
           </>
         );

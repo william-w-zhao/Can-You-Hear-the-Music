@@ -1,11 +1,20 @@
-"""Main agent: the acoustic investigator.
+"""Main agent: the acoustic investigator for one building."""
+from app.agent import prompts
+from app.agent.subagents import subagents
+from app.agent.tools import APPROVAL_TOOL, building_tools
 
-Answers questions like "find the best room for client calls in this building" or
-"what's the cheapest fix for the break room?".
 
-TODO (check the deepagents README for current parameter names):
-- create_deep_agent(tools=..., subagents=SUBAGENTS, system_prompt=prompts.MAIN, ...)
-- working files under data/<sid>/agent/ (so the UI can read them)
-- interrupt_on for the human-approval tool, with a checkpointer
-- planning (write_todos) streamed to the frontend through api/agent.py
-"""
+def create_investigator(sid, model, checkpointer):
+    """A Deep Agent with planning, two sub-agents and a human-approval pause before saving a material change."""
+    from deepagents import create_deep_agent
+
+    tools = building_tools(sid)
+    return create_deep_agent(
+        model=model,
+        tools=[tools[name] for name in ("list_rooms", "room_details", "what_if", "building_facts", "view_room",
+                                        APPROVAL_TOOL)],
+        subagents=subagents(tools),
+        system_prompt=prompts.MAIN,
+        interrupt_on={APPROVAL_TOOL: {"allowed_decisions": ["approve", "reject"]}},
+        checkpointer=checkpointer,
+    )

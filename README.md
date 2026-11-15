@@ -274,6 +274,12 @@ This reuses `rooms.json` and local imagery rather than starting a new scan downl
 
 ### 5. Add the deepagents workflow
 
+**Status:** built. The building page has an "Ask the acoustic investigator" panel. `app/agent/` defines the main
+agent, the `material-annotator` and `acoustic-simulator` sub-agents, and six tools (rooms, room details, what-if,
+listing facts, panorama views, and a material change that pauses for approval). `app/api/agent.py` runs each
+conversation in a background thread; the page polls `/api/agent/threads/{id}/events`. Threads are kept in memory,
+so restarting the backend clears them. `context-scout` and `traffic-analyst` are still to come.
+
 1. In `app/agent/tools.py`, expose room lookup, acoustic comparison, what-if and CoStar context as tools.
    Start with cached results so the first agent question can complete without running a full analysis job.
 2. In `app/agent/`, give the main agent the building context and delegate to specialists for geometry,

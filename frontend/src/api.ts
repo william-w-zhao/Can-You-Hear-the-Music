@@ -276,7 +276,37 @@ function checkedRoom(room: RoomAcoustics): RoomAcoustics {
   return room;
 }
 
+export type AgentTodo = { content: string; status: "pending" | "in_progress" | "completed" };
+export type AgentEvent =
+  | { kind: "user"; text: string }
+  | { kind: "plan"; todos: AgentTodo[] }
+  | { kind: "delegate"; agent: string; task: string }
+  | { kind: "delegate_done"; agent: string }
+  | { kind: "tool"; agent: string; name: string; label: string; args: Record<string, string | number> }
+  | {
+      kind: "approval";
+      room_id: string;
+      surface: string;
+      value: string;
+      reason: string;
+      current: string | null;
+      photo_url: string;
+    }
+  | { kind: "decision"; approved: boolean }
+  | { kind: "answer"; text: string }
+  | { kind: "error"; text: string };
+export type AgentStatus = "idle" | "running" | "awaiting_approval" | "error";
+export type AgentEvents = { status: AgentStatus; events: AgentEvent[]; next: number };
+
 export const api = {
+  agentThread: (sid: string) =>
+    post<{ thread_id: string; model: string }>("/api/agent/threads", { sid }),
+  agentAsk: (threadId: string, text: string) =>
+    post<{ status: AgentStatus }>(`/api/agent/threads/${encodeURIComponent(threadId)}/messages`, { text }),
+  agentEvents: (threadId: string, after: number, signal?: AbortSignal) =>
+    get<AgentEvents>(`/api/agent/threads/${encodeURIComponent(threadId)}/events?after=${after}`, signal),
+  agentDecide: (threadId: string, approve: boolean) =>
+    post<{ status: AgentStatus }>(`/api/agent/threads/${encodeURIComponent(threadId)}/approve`, { approve }),
   roomImageSheet: async (sid: string, signal?: AbortSignal) =>
     (
       await request(`/data/${encodeURIComponent(sid)}/room_sheet.jpg`, {
@@ -292,9 +322,9 @@ export const api = {
     ),
   analysisJob: (jobId: string) =>
     get<AnalysisJob>(`/api/jobs/${encodeURIComponent(jobId)}`),
-  saveMaterials: (jobId: string, materials: Record<string, RoomMaterials>) =>
+  saveMaterials: (sid: string, materials: Record<string, RoomMaterials>) =>
     post<{ job_id: string }>(
-      `/api/jobs/${encodeURIComponent(jobId)}/materials`,
+      `/api/buildings/${encodeURIComponent(sid)}/materials`,
       materials,
     ),
   rooms: async (sid: string, signal?: AbortSignal) => {
@@ -400,10 +430,4 @@ export const api = {
       throw new Error("Invalid voice clip location.");
     return (await request(url, { signal })).arrayBuffer();
   },
-  newThread: (sid: string) =>
-    post<{ thread_id: string }>("/api/agent/threads", { sid }),
-  send: (threadId: string, text: string) =>
-    post(`/api/agent/threads/${threadId}/messages`, { text }),
-  agentEvents: (threadId: string) =>
-    new EventSource(`/api/agent/threads/${threadId}/events`),
 };

@@ -52,9 +52,15 @@ def analyse_building(sid, report):
 
         settings, _ = resolve_review_model()
         suggestions = {}
-        if settings and (directory / "room_sheet.jpg").is_file():
+        # Saved so a backend restart reopens the review form without paying for the model calls again.
+        saved_suggestions = directory / "material_suggestions.json"
+        if saved_suggestions.is_file():
+            suggestions = json.loads(saved_suggestions.read_text())
+        elif settings and (directory / "room_sheet.jpg").is_file():
             suggestions = suggest_materials(directory, geometry["rooms"], report, settings, vision["indoor"]["rooms"]
                                             if vision["indoor"]["status"] == "complete" else {})
+            if suggestions:
+                write_json(saved_suggestions, suggestions)
         if len(suggestions) != len(geometry["rooms"]) or any(
             item["confidence"] < 0.8 for item in suggestions.values()
         ):

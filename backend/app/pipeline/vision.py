@@ -12,9 +12,28 @@ from app.pipeline.cache_files import write_json
 from app.sources.config import DATA, ROOT
 
 MODEL = "yolov8s-worldv2.pt"
+# Each label YOLO-World looks for, with the text descriptions it matches against. One word is often not enough:
+# with only "door", plain white panel doors came back as "cabinet" (1 door against 177 cabinets in four scans).
 # Bathroom and kitchen fixtures are listed too; without them YOLO-World calls a bathtub a "bed".
-ROOM_CLASSES = ("chair", "sofa", "table", "desk", "bed", "bookshelf", "cabinet", "rug", "window", "curtain", "door",
-                "toilet", "bathtub", "shower", "sink", "refrigerator", "stove")
+ROOM_PROMPTS = {
+    "chair": ["chair"], "sofa": ["sofa"], "table": ["table"], "desk": ["desk"], "bed": ["bed"],
+    "bookshelf": ["bookshelf"], "cabinet": ["kitchen cabinet", "cabinet"], "rug": ["rug"],
+    "window": ["window", "glass window", "window with blinds"],
+    "curtain": ["curtain", "drapes"],
+    "door": ["door", "interior door", "white panel door", "closet door", "open door", "doorway"],
+    "fireplace": ["fireplace", "brick fireplace"],
+    "air conditioner": ["air conditioner", "portable air conditioner", "window air conditioner"],
+    "toilet": ["toilet"], "bathtub": ["bathtub"], "shower": ["shower"], "sink": ["sink"],
+    "refrigerator": ["refrigerator"], "stove": ["stove"],
+}
+# Look-alikes YOLO-World otherwise calls a fireplace (framed pictures) or an air conditioner (vents). Matching boxes
+# compete with the real labels and are then dropped, so they never reach the room's evidence.
+DECOY_PROMPTS = ["picture frame", "painting", "air vent", "floor vent", "ceiling light"]
+ROOM_CLASSES = tuple(ROOM_PROMPTS)
+DECOY = "decoy"
+# Labels too unreliable to trust at any score (framed pictures and dark doorways outscore real fireplaces),
+# so they are always listed as candidates for a person or the review agent to check.
+ALWAYS_REVIEW = {"fireplace"}
 # Describe what the top-down camera sees; "building" alone misses roofs in our Vexcel clips.
 AERIAL_CLASSES = ("house roof", "building roof", "commercial roof")
 MIN_SCORE = 0.10
@@ -50,14 +69,19 @@ def detector(classes):
 
 
 def predict(images, classes, imgsz):
-    """Convert Ultralytics tensors to ordinary values, retaining input-image coordinates."""
-    results = detector(classes).predict(
+    """Convert Ultralytics tensors to ordinary values, retaining input-image coordinates.
+
+    `classes` is a tuple of labels, or a dict of label -> text descriptions (see ROOM_PROMPTS). Overlapping boxes
+    compete across labels, so one object gets the single best-matching label instead of "door" and "cabinet"."""
+    pairs = ([(prompt, label) for label, prompts in classes.items() for prompt in prompts]
+             if isinstance(classes, dict) else [(label, label) for label in classes])
+    results = detector(tuple(prompt for prompt, _ in pairs)).predict(
         images, imgsz=imgsz, conf=MIN_SCORE, iou=0.45, max_det=100,
-        device="cpu", verbose=False,
+        device="cpu", verbose=False, agnostic_nms=True,
     )
     return [
         [
-            {"label": classes[int(label)], "confidence": round(score, 3),
+            {"label": pairs[int(label)][1], "confidence": round(score, 3),
              "needs_review": score < REVIEW_BELOW, "box_px": [round(n, 1) for n in coords]}
             for label, score, coords in zip(
                 result.boxes.cls.tolist(), result.boxes.conf.tolist(), result.boxes.xyxy.tolist()
@@ -85,9 +109,13 @@ def inspect_rooms(directory, rooms, report):
             bounds = [(SHEET_MARGIN + col * size, row * size,
                        SHEET_MARGIN + (col + 1) * size, (row + 1) * size) for col in range(len(VIEWS))]
             detections = []
-            for view_index, hits in enumerate(predict([sheet.crop(box) for box in bounds], ROOM_CLASSES, 480)):
+            for view_index, hits in enumerate(predict([sheet.crop(box) for box in bounds], {**ROOM_PROMPTS, DECOY: DECOY_PROMPTS}, 480)):
                 x, y = bounds[view_index][:2]
                 for hit in hits:
+                    if hit["label"] == DECOY:
+                        continue
+                    if hit["label"] in ALWAYS_REVIEW:
+                        hit = {**hit, "needs_review": True}
                     left, top, right, bottom = hit["box_px"]
                     detections.append({
                         **hit, "view": VIEWS[view_index], "face_index": FACE_ORDER[view_index],
@@ -155,12 +183,12 @@ def analyse_vision(directory, geometry, report, *, refresh=False, strict=False):
     result = {"model": MODEL, "minimum_score": MIN_SCORE, "review_below": REVIEW_BELOW}
     same_model = all(cache.get(field) == value for field, value in result.items())
     for key, filename, classes, run in (
-        ("indoor", "room_sheet.jpg", ROOM_CLASSES, lambda: inspect_rooms(directory, geometry["rooms"], report)),
+        ("indoor", "room_sheet.jpg", {**ROOM_PROMPTS, DECOY: DECOY_PROMPTS}, lambda: inspect_rooms(directory, geometry["rooms"], report)),
         ("aerial", "ortho.png", AERIAL_CLASSES, lambda: inspect_aerial(directory, report)),
     ):
         source = directory / filename
         source_stamp = source.stat().st_mtime_ns if source.is_file() else None
-        signature = {"classes": list(classes), "mtime_ns": source_stamp}
+        signature = {"classes": classes if isinstance(classes, dict) else list(classes), "mtime_ns": source_stamp}
         saved = cache.get(key, {})
         if same_model and saved.get("status") == "complete" and saved.get("signature") == signature and (
             key != "indoor" or saved["rooms"].keys() == {room["id"] for room in geometry["rooms"]}

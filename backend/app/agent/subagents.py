@@ -1,11 +1,26 @@
-"""Sub-agents, one per job, each wrapping real pipeline functions (see tools.py).
+"""Sub-agents, one per job, each limited to the tools that job needs (see tools.py).
 
-- room-surveyor:       rooms and geometry           -> pipeline.rooms
-- material-annotator:  materials from panoramas     -> pipeline.materials (asks a person when unsure)
-- acoustic-simulator:  echo times, what-ifs, audio  -> pipeline.acoustics
-- context-scout:       year built, tenants, use     -> sources.costar_kit
-- traffic-analyst:     street noise (later)         -> pipeline (not built yet)
-
-TODO: define SUBAGENTS = [...] with name, description, system prompt and tools.
+- material-annotator:  compares saved materials with the panorama photos
+- acoustic-simulator:  compares treatments with what-if recalculations
+- context-scout and traffic-analyst come later, once CoStar context and street-noise data are tools.
 """
-SUBAGENTS: list = []
+from app.agent import prompts
+
+
+def subagents(tools):
+    return [
+        {
+            "name": "material-annotator",
+            "description": "Checks one room's saved floor, ceiling, wall and furnishing labels against its "
+                           "panorama photos. Give it the room ID.",
+            "system_prompt": prompts.MATERIAL_ANNOTATOR,
+            "tools": [tools["room_details"], tools["view_room"]],
+        },
+        {
+            "name": "acoustic-simulator",
+            "description": "Compares acoustic treatments for one or more rooms with what-if recalculations and "
+                           "returns a table of options. Give it the room IDs and the goal.",
+            "system_prompt": prompts.ACOUSTIC_SIMULATOR,
+            "tools": [tools["list_rooms"], tools["room_details"], tools["what_if"]],
+        },
+    ]

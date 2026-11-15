@@ -67,22 +67,35 @@ def get_job(job_id: str):
         return {**job, "job_id": job_id}
 
 
+def save_materials(sid, materials, room_ids):
+    """Save reviewed labels and calculate echo times. Works even if the job that asked for them was lost
+    (jobs live in memory, so a backend restart forgets them)."""
+    if materials.keys() != set(room_ids):
+        raise HTTPException(422, "Provide materials for every room in this scan.")
+    with lock:
+        job_id = latest.get(sid)
+        if job_id and jobs[job_id]["status"] == "running":
+            raise HTTPException(409, "This scan is already being analysed. Wait for it to finish.")
+        write_json(DATA / sid / "materials.json", {
+            "labelled_by": "Reviewed in the building dashboard",
+            "rooms": {room_id: material.model_dump() for room_id, material in materials.items()},
+        })
+        if not job_id or jobs[job_id]["status"] != "needs_materials":
+            job_id = uuid4().hex
+            latest[sid] = job_id
+            jobs[job_id] = {"sid": sid}
+        jobs[job_id].update(status="running", message="Calculating room echo times", review=None)
+        worker.submit(run_job, job_id, sid)
+    return {"job_id": job_id}
+
+
 @router.post("/{job_id}/materials")
 def submit_materials(job_id: str, materials: dict[str, RoomMaterials]):
     with lock:
         job = jobs.get(job_id)
         if job is None:
-            raise HTTPException(404, "Analysis job not found.")
+            raise HTTPException(404, "Analysis job not found. Reload the page and save again.")
         if job["status"] != "needs_materials":
             raise HTTPException(409, "This job is no longer waiting for material labels.")
-        room_ids = {room["id"] for room in job["review"]["rooms"]}
-        if materials.keys() != room_ids:
-            raise HTTPException(422, "Provide materials for every room in this scan.")
-        sid = job["sid"]
-        write_json(DATA / sid / "materials.json", {
-            "labelled_by": "Reviewed in the building dashboard",
-            "rooms": {room_id: material.model_dump() for room_id, material in materials.items()},
-        })
-        job.update(status="running", message="Calculating room echo times", review=None)
-        worker.submit(run_job, job_id, sid)
-    return {"job_id": job_id}
+        sid, room_ids = job["sid"], [room["id"] for room in job["review"]["rooms"]]
+    return save_materials(sid, materials, room_ids)

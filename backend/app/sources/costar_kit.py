@@ -74,6 +74,8 @@ def build():
             offsets.setdefault(sid, {})["listing"] = off
         if lid in features:
             offsets.setdefault(sid, {})["features"] = features[lid][0]
+        # A scan can have multiple listings. Keep the last available street address.
+        row["address"] = row["address"].strip() or rows.get(sid, {}).get("address", "")
         rows[sid] = row
     for r in com:
         sid, pid = r["MatterportModelId"], r["PropertyId"]

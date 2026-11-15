@@ -249,6 +249,49 @@ h2 { font-size: 1.2rem; line-height: 1.3; }
 .evidence-box:focus { outline: none; }
 .evidence-box:focus-visible { stroke-width: 5px; }
 
+/* ================= Investigator agent (AgentPanel) ================= */
+.agent-panel { max-width: 860px; padding: clamp(16px, 3vw, 24px); border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.agent-intro { margin-top: 6px; color: var(--muted); line-height: 1.5; }
+.agent-suggestions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.agent-suggestions button { padding: 8px 14px; border: 1px solid var(--line); border-radius: 999px; background: white; color: var(--ink); font: inherit; font-size: .9rem; cursor: pointer; }
+.agent-suggestions button:hover:not(:disabled) { border-color: var(--ink); }
+.agent-turn { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); }
+.agent-turn:first-of-type { border-top: 0; padding-top: 0; }
+.agent-question { justify-self: end; margin-left: auto; width: fit-content; max-width: 85%; padding: 10px 14px; border-radius: 14px 14px 4px 14px; background: #1e2822; color: white; line-height: 1.45; }
+.agent-plan { display: grid; gap: 4px; margin: 14px 0 0; padding: 0; list-style: none; font-size: .9rem; color: var(--muted); }
+.agent-plan li { display: flex; gap: 8px; }
+.agent-plan .todo-completed { text-decoration: line-through; }
+.agent-plan .todo-in_progress { color: var(--ink); font-weight: 600; }
+.agent-activity { margin-top: 12px; font-size: .88rem; color: var(--muted); }
+.agent-activity summary { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 600; }
+.agent-activity ul { display: grid; gap: 6px; margin: 10px 0 0; padding-left: 4px; list-style: none; }
+.agent-activity li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; min-width: 0; }
+.agent-activity li.agent-sub { padding-left: 16px; border-left: 2px solid var(--line); }
+.agent-activity code { overflow-wrap: anywhere; font-size: .8rem; color: var(--muted); }
+.agent-who { padding: 1px 8px; border-radius: 999px; background: #f0efe8; color: var(--ink); font-size: .75rem; font-weight: 700; }
+.agent-delegate { flex-direction: column; gap: 2px !important; margin-top: 4px; }
+.agent-delegate strong { color: var(--ink); }
+.agent-delegate span { line-height: 1.4; }
+.agent-answer { margin-top: 14px; line-height: 1.55; }
+.agent-answer > * + * { margin-top: 10px; }
+.agent-answer ul { padding-left: 20px; }
+.agent-table { overflow-x: auto; }
+.agent-table table { border-collapse: collapse; font-size: .9rem; }
+.agent-table th, .agent-table td { padding: 6px 10px; border-bottom: 1px solid var(--line); text-align: left; }
+.agent-approval { display: grid; grid-template-columns: 160px 1fr; gap: 14px; margin-top: 14px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: white; }
+.agent-approval img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; background: #f0efe8; }
+.agent-approval p { line-height: 1.45; }
+.agent-approval p + p { margin-top: 6px; color: var(--muted); }
+.agent-approval-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.agent-approval-actions button { padding: 8px 14px; border: 1px solid var(--line); border-radius: 999px; background: white; font: inherit; font-weight: 600; cursor: pointer; }
+.agent-approval-actions .agent-approve { border-color: #1e2822; background: #1e2822; color: white; }
+.agent-note { margin-top: 10px; color: var(--muted); font-size: .9rem; }
+.agent-form { display: flex; gap: 8px; margin-top: 18px; }
+.agent-form input { flex: 1; min-width: 0; min-height: 44px; padding: 8px 14px; border: 1px solid var(--line); border-radius: 999px; background: white; color: var(--ink); font: inherit; }
+.agent-form button { min-height: 44px; padding: 0 20px; border: 0; border-radius: 999px; background: #1e2822; color: white; font: inherit; font-weight: 700; cursor: pointer; }
+.agent-form button:disabled, .agent-form input:disabled { opacity: .55; cursor: not-allowed; }
+@media (max-width: 540px) { .agent-approval { grid-template-columns: 1fr; } .agent-approval img { max-width: 220px; } }
+
 /* ================= Home page ================= */
 .home {
   --sage: #1e2822; --sage-deep: #000; --mint: #f0efe8;

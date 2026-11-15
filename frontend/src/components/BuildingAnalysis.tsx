@@ -6,11 +6,12 @@ type Props = { sid: string; initialJobId?: string; onReady: () => void; visionOn
 type Review = NonNullable<AnalysisJob["review"]>;
 const surfaceFields = ["floor", "ceiling", "walls"] as const;
 
-function MaterialReview({ sid, review, onSave, busy }: {
+function MaterialReview({ sid, review, onSave, busy, error }: {
   sid: string;
   review: Review;
   onSave: (materials: Record<string, RoomMaterials>) => void;
   busy: boolean;
+  error: string;
 }) {
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -66,7 +67,9 @@ function MaterialReview({ sid, review, onSave, busy }: {
           </fieldset>
         );
       })}
-      <button className="show-more" disabled={busy}>Save materials and calculate</button>
+      {/* Errors show beside the button: the form is long, so a message at the top would be off screen. */}
+      {error && <p className="intro" role="alert">{error}</p>}
+      <button className="show-more" disabled={busy}>{busy ? "Saving…" : "Save materials and calculate"}</button>
     </form>
   );
 }
@@ -123,8 +126,9 @@ export default function BuildingAnalysis({ sid, initialJobId, onReady, visionOnl
     setError("");
     setBusy(true);
     try {
-      await api.saveMaterials(job.job_id, materials);
-      setJob({ ...job, status: "running", message: "Calculating room echo times", review: null });
+      const result = await api.saveMaterials(sid, materials);
+      setJob({ ...job, job_id: result.job_id, status: "running", message: "Calculating room echo times", review: null });
+      setJobId(result.job_id);
       setPollVersion((version) => version + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn’t save materials.");
@@ -143,14 +147,14 @@ export default function BuildingAnalysis({ sid, initialJobId, onReady, visionOnl
           ? "Look for objects in the room panoramas and roofs in the aerial image."
           : "Prepare room outlines, detect objects and estimate echo times for this scan.")}</p>
       )}
-      {error && <p className="intro" role="alert">{error}</p>}
+      {error && job?.status !== "needs_materials" && <p className="intro" role="alert">{error}</p>}
       {(!jobId || job?.status === "failed") && (
         <button className="show-more" disabled={busy} onClick={() => void start()}>
           {job?.status === "failed" ? "Retry analysis" : visionOnly ? "Run image analysis" : "Analyse building"}
         </button>
       )}
       {job?.status === "needs_materials" && job.review && (
-        <MaterialReview sid={sid} review={job.review} onSave={(materials) => void save(materials)} busy={busy} />
+        <MaterialReview sid={sid} review={job.review} onSave={(materials) => void save(materials)} busy={busy} error={error} />
       )}
     </section>
   );
