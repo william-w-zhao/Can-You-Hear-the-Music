@@ -1,6 +1,6 @@
 # Can You Hear the Music?
 
-HackPrinceton 2026 (CoStar, main and LangChain Deep Agents tracks). Pick a scanned building, pick a room, and hear
+HackPrinceton 2026 (Sustainability/Business/Science + Discovery, CoStar, main and LangChain Deep Agents tracks). Pick a scanned building, pick a room, and hear
 it: how long a voice echoes, how much street noise gets in at any hour, and what a change such as a rug, carpet or
 acoustic panels would do. An AI investigator answers questions like "which bedroom is quietest at night?" and asks
 before it saves any change.
